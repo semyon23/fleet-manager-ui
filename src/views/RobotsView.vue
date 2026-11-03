@@ -1,12 +1,12 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, h } from 'vue'
 import { useRobotsStore } from '../stores/robots'
 import {
   NCard, NDataTable, NTag, NButton, NModal, NInput, NSelect, NSwitch, NPopconfirm,
-  NDrawer, NDrawerContent, NEmpty, useMessage,
+  NDrawer, NDrawerContent, NEmpty, NTooltip, useMessage,
 } from 'naive-ui'
-import { h } from 'vue'
 import { previewSpriteFor, tintStyle } from '../lib/robotSprite'
+import { AVAILABILITY_OPTIONS, availabilityOf } from '../lib/availability'
 import * as api from '../api'
 import { subscribeRobot, unsubscribeRobot } from '../composables/useRobotMqtt'
 
@@ -18,30 +18,13 @@ function toggleLive(val) {
   else store.stopPolling()
 }
 
-const statusColor = {
-  moving: '#22c55e',
-  charging: '#eab308',
-  idle: '#64748b',
-  error: '#ef4444',
-  offline: '#94a3b8',
-  deploying: '#f97316',
-}
-const statusOptions = [
-  { label: 'Moving', value: 'moving' },
-  { label: 'Charging', value: 'charging' },
-  { label: 'Idle', value: 'idle' },
-  { label: 'Error', value: 'error' },
-  { label: 'Offline', value: 'offline' },
-  { label: 'Deploying', value: 'deploying' },
-]
-
-// === Filter by status ===
-const statusFilter = ref([])  // pустой = все
+// === Filter by availability state ===
+const stateFilter = ref([])  // пустой = все
 
 const filteredRobots = computed(() => {
-  if (!statusFilter.value.length) return store.robots
-  const set = new Set(statusFilter.value)
-  return store.robots.filter((r) => set.has(r.status))
+  if (!stateFilter.value.length) return store.robots
+  const set = new Set(stateFilter.value)
+  return store.robots.filter((r) => set.has(r.availability?.state))
 })
 
 // === Drawer with robot details ===
@@ -64,24 +47,69 @@ function connectionErrorText(e) {
 }
 
 // === Delete ===
-function deleteErrorText(e, name) {
-  if (e?.code === 'NOT_FOUND') return `Robot "${name}" is already deleted`
-  if (e?.code === 'ROBOT_BUSY') return `Robot "${name}" is executing a mission — wait for it to finish`
-  return connectionErrorText(e) || `Failed to delete robot "${name}"`
-}
-async function deleteRobot(id) {
+// Робот с миссией: сервер отвечает ROBOT_BUSY — спрашиваем, удалить ли с отменой миссии (?force=true)
+const busyRobot = ref(null)   // { id, mission } — открыт диалог «робот занят»
+
+async function deleteRobot(id, force = false) {
   try {
-    await api.robots.deleteRobot(id)
+    await api.robots.deleteRobot(id, { force })
     store.removeRobot(id)
     unsubscribeRobot(id)
     if (selectedId.value === id) { selectedId.value = null; showDrawer.value = false }
-    msg.success(`Robot "${id}" deleted`)
+    busyRobot.value = null
+    msg.success(force ? `Robot "${id}" deleted, its mission is canceled` : `Robot "${id}" deleted`)
   } catch (e) {
-    msg.error(deleteErrorText(e, id))
+    if (e?.code === 'ROBOT_BUSY' && !force) {
+      busyRobot.value = { id, mission: store.robots.find((r) => r.id === id)?.mission }
+      return
+    }
+    busyRobot.value = null
+    if (e?.code === 'NOT_FOUND') msg.error(`Robot "${id}" is already deleted`)
+    else msg.error(connectionErrorText(e) || `Failed to delete robot "${id}"`)
+  }
+}
+
+// === Pause / resume ===
+// Ответ — «команда отправлена»; что робот встал на паузу, видно по status.paused при следующем опросе
+async function setPaused(robot, paused) {
+  try {
+    if (paused) await api.robots.pauseRobot(robot.id)
+    else await api.robots.resumeRobot(robot.id)
+    msg.success(paused ? `Pause sent to "${robot.id}"` : `Resume sent to "${robot.id}"`)
+  } catch (e) {
+    if (e?.code === 'NOT_FOUND') msg.error(`Robot "${robot.id}" is not connected to the fleet yet`)
+    else msg.error(connectionErrorText(e) || 'Failed to send the command')
   }
 }
 
 // === Table columns ===
+function availabilityTag(r) {
+  const meta = availabilityOf(r)
+  const reasons = r.availability?.reasons || []
+  const tag = h(NTag, { color: { color: meta.color, textColor: 'white' }, size: 'small' }, { default: () => meta.label })
+  if (!reasons.length) return tag
+  // Причины — в подсказке; рядом число, чтобы было видно, что подсказка есть
+  return h(NTooltip, null, {
+    trigger: () => h('span', { class: 'inline-flex items-center gap-1' }, [
+      tag,
+      h('span', { class: 'text-xs text-slate-500 dark:text-slate-400' }, `${reasons.length} ⓘ`),
+    ]),
+    default: () => h('ul', { class: 'text-xs' }, reasons.map((x) => h('li', x.message))),
+  })
+}
+
+function batteryBar(r) {
+  return h('div', { class: 'flex items-center gap-2 min-w-[90px]' }, [
+    h('div', { class: 'h-1.5 flex-1 rounded bg-slate-200 dark:bg-slate-700 overflow-hidden' }, [
+      h('div', {
+        class: 'h-full',
+        style: `width: ${r.battery}%; background: ${r.battery < 20 ? '#ef4444' : r.battery < 50 ? '#eab308' : '#22c55e'}`,
+      }),
+    ]),
+    h('span', { class: 'font-mono text-xs w-10 text-right' }, `${r.charging ? '⚡' : ''}${r.battery}%`),
+  ])
+}
+
 const columns = [
   {
     title: '',
@@ -97,48 +125,44 @@ const columns = [
   },
   {
     title: 'ID', key: 'id', sorter: 'default',
-    render: (r) => h('button', {
-      class: 'font-mono text-brand-800 dark:text-brand-300 hover:underline',
-      onClick: (e) => { e.stopPropagation(); openDrawer(r.id) },
-    }, r.id),
-  },
-  { title: 'Model', key: 'model' },
-  {
-    title: 'Status', key: 'status',
-    filterOptions: statusOptions,
-    filter: (val, row) => row.status === val,
-    render: (r) => h(NTag, { color: { color: statusColor[r.status], textColor: 'white' }, size: 'small' }, { default: () => r.status }),
-  },
-  {
-    title: 'Battery', key: 'battery', sorter: (a, b) => a.battery - b.battery,
-    render: (r) => h('div', { class: 'flex items-center gap-2 min-w-[70px]' }, [
-      h('div', { class: 'h-1.5 flex-1 rounded bg-slate-200 dark:bg-slate-700 overflow-hidden' }, [
-        h('div', {
-          class: 'h-full',
-          style: `width: ${r.battery}%; background: ${r.battery < 20 ? '#ef4444' : r.battery < 50 ? '#eab308' : '#22c55e'}`,
-        }),
-      ]),
-      h('span', { class: 'font-mono text-xs w-8 text-right' }, `${r.battery}%`),
+    render: (r) => h('div', { class: 'flex flex-col' }, [
+      h('button', {
+        class: 'font-mono text-left text-brand-800 dark:text-brand-300 hover:underline',
+        onClick: (e) => { e.stopPropagation(); openDrawer(r.id) },
+      }, r.id),
+      r.name && r.name !== r.id ? h('span', { class: 'text-xs text-slate-500' }, r.name) : null,
     ]),
   },
+  { title: 'Robot', key: 'model', render: (r) => h('span', { class: 'font-mono text-xs' }, r.model) },
+  {
+    title: 'State', key: 'state',
+    sorter: (a, b) => availabilityOf(a).label.localeCompare(availabilityOf(b).label),
+    render: availabilityTag,
+  },
+  { title: 'Battery', key: 'battery', sorter: (a, b) => a.battery - b.battery, render: batteryBar },
   { title: 'Mission', key: 'mission', render: (r) => h('span', { class: 'font-mono text-xs text-slate-500' }, r.mission || '—') },
-  { title: 'Uptime', key: 'uptime', render: (r) => h('span', { class: 'font-mono text-xs' }, r.uptime) },
   {
     title: 'Actions', key: 'actions',
     render: (r) =>
-      h('div', { class: 'flex gap-1' }, [
-        h(NButton, { size: 'tiny', tertiary: true, onClick: () => openDrawer(r.id) }, { default: () => 'Details' }),
+      h('div', { class: 'flex gap-1', onClick: (e) => e.stopPropagation() }, [
+        h(NButton, {
+          size: 'tiny', tertiary: true, disabled: r.connection !== 'ONLINE',
+          title: r.paused ? 'Resume the robot' : 'Pause the robot',
+          onClick: () => setPaused(r, !r.paused),
+        }, { default: () => (r.paused ? 'Resume' : 'Pause') }),
         h(NPopconfirm, {
           onPositiveClick: () => deleteRobot(r.id),
           positiveText: 'Delete',
           negativeText: 'Cancel',
         }, {
-          default: () => `Delete robot "${r.id}"? It will be removed from the fleet on the backend.`,
+          default: () => `Delete robot "${r.id}" from the fleet?`,
           trigger: () => h(NButton, { size: 'tiny', tertiary: true, type: 'error', title: 'Delete robot' }, { default: () => '✕' }),
         }),
       ]),
   },
 ]
+
+const errorLevelColor = { WARNING: '#eab308', URGENT: '#f97316', CRITICAL: '#ef4444', FATAL: '#b91c1c' }
 
 // Высота таблицы: подобрана так, чтобы верх (header топбара + отступы +
 // заголовок карточки) вычитался из вьюпорта. Внутри NDataTable будет sticky
@@ -196,11 +220,11 @@ async function submitRegister() {
     <template #header-extra>
       <div class="flex items-center gap-3">
         <NSelect
-          v-model:value="statusFilter"
-          :options="statusOptions"
+          v-model:value="stateFilter"
+          :options="AVAILABILITY_OPTIONS"
           multiple
           size="small"
-          placeholder="All statuses"
+          placeholder="All states"
           clearable
           style="width: 220px"
         />
@@ -236,7 +260,7 @@ async function submitRegister() {
     />
     <div v-if="store.robots.length && filteredRobots.length === 0" class="mt-3 text-center text-xs text-slate-500">
       No robots match the current filter.
-      <NButton size="tiny" tertiary @click="statusFilter = []">Clear filter</NButton>
+      <NButton size="tiny" tertiary @click="stateFilter = []">Clear filter</NButton>
     </div>
 
     <!-- ============================================================= -->
@@ -302,12 +326,27 @@ async function submitRegister() {
             />
           </div>
 
-          <div class="grid grid-cols-2 gap-3 text-sm">
-            <div class="text-slate-500">Status</div>
-            <div><NTag :color="{ color: statusColor[selectedRobot.status], textColor: 'white' }" size="small">{{ selectedRobot.status }}</NTag></div>
+          <div>
+            <NTag :color="{ color: availabilityOf(selectedRobot).color, textColor: 'white' }">
+              {{ availabilityOf(selectedRobot).label }}
+            </NTag>
+            <ul v-if="selectedRobot.availability?.reasons?.length" class="mt-2 flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
+              <li v-for="reason in selectedRobot.availability.reasons" :key="reason.code">• {{ reason.message }}</li>
+            </ul>
+          </div>
 
-            <div class="text-slate-500">Model</div>
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="text-slate-500">Name</div>
+            <div>{{ selectedRobot.name }}</div>
+
+            <div class="text-slate-500">Manufacturer / serial</div>
             <div class="font-mono text-xs">{{ selectedRobot.model }}</div>
+
+            <div class="text-slate-500">Connection</div>
+            <div class="font-mono text-xs">{{ selectedRobot.connection }}</div>
+
+            <div class="text-slate-500">Mode</div>
+            <div class="font-mono text-xs">{{ selectedRobot.operatingMode || '—' }}</div>
 
             <div class="text-slate-500">Battery</div>
             <div class="flex items-center gap-2">
@@ -317,31 +356,46 @@ async function submitRegister() {
                   :style="`width: ${selectedRobot.battery}%; background: ${selectedRobot.battery < 20 ? '#ef4444' : selectedRobot.battery < 50 ? '#eab308' : '#22c55e'}`"
                 ></div>
               </div>
-              <span class="font-mono text-xs">{{ selectedRobot.battery }}%</span>
+              <span class="font-mono text-xs">{{ selectedRobot.charging ? '⚡ ' : '' }}{{ selectedRobot.battery }}%</span>
             </div>
 
-            <div class="text-slate-500">Position</div>
-            <div class="font-mono text-xs">{{ selectedRobot.x.toFixed(2) }}, {{ selectedRobot.y.toFixed(2) }} m</div>
+            <div class="text-slate-500">Last node</div>
+            <div class="font-mono text-xs">{{ selectedRobot.lastNodeId || '—' }}</div>
 
-            <div class="text-slate-500">Heading</div>
-            <div class="font-mono text-xs">{{ ((selectedRobot.theta * 180) / Math.PI).toFixed(1) }}°</div>
+            <div class="text-slate-500">Position</div>
+            <div class="font-mono text-xs">
+              {{ selectedRobot.x.toFixed(2) }}, {{ selectedRobot.y.toFixed(2) }} m · {{ ((selectedRobot.theta * 180) / Math.PI).toFixed(1) }}°
+              <span v-if="selectedRobot.mapId" class="text-slate-500">· {{ selectedRobot.mapId }}</span>
+            </div>
 
             <div class="text-slate-500">Mission</div>
             <div class="font-mono text-xs">{{ selectedRobot.mission || '—' }}</div>
 
-            <div class="text-slate-500">Uptime</div>
-            <div class="font-mono text-xs">{{ selectedRobot.uptime }}</div>
+            <div class="text-slate-500">Last update</div>
+            <div class="font-mono text-xs">{{ selectedRobot.lastStateAt ? new Date(selectedRobot.lastStateAt).toLocaleTimeString() : '—' }}</div>
           </div>
 
-          <div class="rounded bg-slate-50 dark:bg-slate-800 p-3 text-xs text-slate-500 dark:text-slate-400">
-            Pause / Stop / Home commands and live pose will be wired once the backend
-            exposes <code>POST /api/fms/robots/:id/command</code> and WebSocket state.
+          <div v-if="selectedRobot.errors.length" class="flex flex-col gap-2">
+            <div class="text-sm text-slate-500">Robot errors</div>
+            <div
+              v-for="(err, i) in selectedRobot.errors"
+              :key="i"
+              class="rounded border border-slate-200 dark:border-slate-700 p-2 text-xs"
+            >
+              <NTag size="tiny" :color="{ color: errorLevelColor[err.level] || '#64748b', textColor: 'white' }">{{ err.level }}</NTag>
+              <span class="ml-2 font-mono">{{ err.errorType }}</span>
+              <div v-if="err.description" class="mt-1 text-slate-600 dark:text-slate-300">{{ err.description }}</div>
+            </div>
           </div>
 
           <div class="flex gap-2">
-            <NButton size="small" disabled title="Backend not yet implemented">Pause</NButton>
-            <NButton size="small" type="error" disabled title="Backend not yet implemented">Stop</NButton>
-            <NButton size="small" type="primary" disabled title="Backend not yet implemented">Home</NButton>
+            <NButton
+              size="small"
+              :disabled="selectedRobot.connection !== 'ONLINE'"
+              @click="setPaused(selectedRobot, !selectedRobot.paused)"
+            >
+              {{ selectedRobot.paused ? 'Resume' : 'Pause' }}
+            </NButton>
             <div class="flex-1"></div>
             <NPopconfirm
               :on-positive-click="() => deleteRobot(selectedRobot.id)"
@@ -351,12 +405,32 @@ async function submitRegister() {
               <template #trigger>
                 <NButton size="small" type="error" tertiary>Delete</NButton>
               </template>
-              Delete robot "{{ selectedRobot.id }}"?
+              Delete robot "{{ selectedRobot.id }}" from the fleet?
             </NPopconfirm>
           </div>
         </div>
         <div v-else class="text-sm text-slate-500">No robot selected.</div>
       </NDrawerContent>
     </NDrawer>
+
+    <!-- Робот занят: удалить с отменой миссии? -->
+    <NModal
+      :show="!!busyRobot"
+      preset="dialog"
+      type="warning"
+      title="Robot is busy"
+      positive-text="Delete and cancel mission"
+      negative-text="Keep the robot"
+      @positive-click="deleteRobot(busyRobot.id, true)"
+      @negative-click="busyRobot = null"
+      @close="busyRobot = null"
+      @mask-click="busyRobot = null"
+    >
+      <template v-if="busyRobot">
+        Robot "{{ busyRobot.id }}" is executing mission
+        <span class="font-mono">{{ busyRobot.mission || '' }}</span>.
+        Deleting it cancels the mission and stops the robot.
+      </template>
+    </NModal>
   </NCard>
 </template>

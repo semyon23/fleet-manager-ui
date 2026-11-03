@@ -79,7 +79,7 @@ lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphC
 
 Внутренний формат робота (то, что ест UI, строит `toViewRobot`):
 `{ id, name, manufacturer, serialNumber, labels, lifecycle, model, availability{state, reasons}, status, connection, battery, charging, x, y, theta, mapId, positionInitialized, lastNodeId, paused, errors, mission, uptime, sprites }`.
-`status` (цвет, фильтры) пока выводится из `availability.state` переходной таблицей: `moving | charging | idle | error | offline` (U-1, 2026-11-03); на шаге U-3 экраны перейдут на `availability` целиком.
+Состояние робота для UI — `availability.state` (подписи и цвета — `lib/availability.js`), так уже работает экран Robots. Старый `status` (`moving | charging | idle | error | offline`) пока выводится из `availability.state` переходной таблицей в `toViewRobot` — им ещё пользуются Dashboard, Live Map и тонировка спрайта; уберётся в U-5.
 
 ## 5. Как устроены ключевые вещи
 
@@ -151,7 +151,7 @@ lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphC
 2. **Сервисный режим / mapping** (идея Семёна): отдельным экраном (Teleop из UI убран) показывать SLAM-карту, которая строится пока катаешь робота, потом сохранить на сервер и нанести маршруты. Решение Семёна: **в обход FMS**, фронт напрямую подключается к локальному WS-серверу на роботе (IP робота в настройках фронта), перед входом отменяются все задачи робота. Не решено: откуда фронт берёт IP:порт, формат SLAM-сообщений (черновик — `slam_map` с base64+gzip occupancy grid, `resolution/origin/width/height`), CORS на роботе, отдельная страница `/mapping/:id`. Пока не начато.
 3. **Формат Alerts** (`GET /api/fms/alerts`): предложен `{id, severity, source: robot|system, robot_id|null, title, detail, created_at, acknowledged}` + `POST /api/fms/alerts/:id/ack`. Через HTTP-запрос, не WS. Не утверждено; после утверждения делаем колокольчик со счётчиком непрочитанных в топбаре.
 4. **Миссии**: `POST/GET /api/fms/missions`, `POST .../:id/cancel` — фронт (мастер + таблица + cancel) готов, ждёт бэк.
-5. **Переход на контракт v2** (2026-11-03): U-1 API-слой роботов — сделан; дальше U-2 стор, U-3 экран Robots на `availability`, U-4 MQTT `amr/v3` + `serialNumber` и без WebSocket, U-5 Dashboard / Live Map.
+5. **Переход на контракт v2** (2026-11-03): U-1 API-слой роботов, U-2 стор (`byState`, опрос на паузе при скрытой вкладке), U-3 экран Robots на `availability` (причины в подсказке, Pause/Resume, удаление с `ROBOT_BUSY` → диалог «удалить и отменить миссию», карточка с ошибками робота) — сделаны; дальше U-4 MQTT `amr/v3` + `serialNumber` и без WebSocket, U-5 Dashboard / Live Map.
 
 **Решено «нет» / отложено:** кнопка `initPosition` (обнуление позиции) — «пока не будем»; мобильная вёрстка — «пока нет»; e2e в CI — «не знаю» (не решено).
 

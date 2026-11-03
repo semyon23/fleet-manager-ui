@@ -245,6 +245,8 @@ export function toViewRobot(r) {
     positionInitialized: s?.localized ?? false,
     lastNodeId: s?.lastNodeId || '',
     paused: s?.paused ?? false,
+    operatingMode: s?.operatingMode ?? null,
+    lastStateAt: s?.lastStateAt ?? null,
     errors: s?.errors ?? [],
     mission: s?.missionId ?? null,
     uptime: '—',

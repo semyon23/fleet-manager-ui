@@ -31,6 +31,17 @@ export const useRobotsStore = defineStore('robots', () => {
     total: robots.value.length,
   }))
 
+  // Сколько роботов в каждом состоянии готовности (availability.state, контракт v2).
+  // counts выше — по старому фронтовому status, им пока пользуются Dashboard и Live Map (переедут в U-5).
+  const byState = computed(() => {
+    const result = { total: robots.value.length }
+    for (const r of robots.value) {
+      const state = r.availability?.state || 'UNKNOWN'
+      result[state] = (result[state] || 0) + 1
+    }
+    return result
+  })
+
   const totalBattery = computed(() => {
     if (!robots.value.length) return 0
     return Math.round(robots.value.reduce((s, r) => s + r.battery, 0) / robots.value.length)
@@ -63,15 +74,31 @@ export const useRobotsStore = defineStore('robots', () => {
     }
   }
 
-  function startPolling() {
+  function startTimer() {
     if (pollTimer) return
-    pollingActive.value = true
     pollOnce()
     pollTimer = setInterval(pollOnce, POLL_MS)
   }
-  function stopPolling() {
+  function stopTimer() {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+  }
+
+  function startPolling() {
+    pollingActive.value = true
+    if (typeof document === 'undefined' || document.visibilityState !== 'hidden') startTimer()
+  }
+  function stopPolling() {
+    stopTimer()
     pollingActive.value = false
+  }
+
+  // Вкладка скрыта — не опрашиваем (контракт v2, раздел 9.1); вернулись — сразу опрос и дальше по таймеру
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (!pollingActive.value) return
+      if (document.visibilityState === 'hidden') stopTimer()
+      else startTimer()
+    })
   }
 
   // Только что зарегистрированный робот (ответ api.robots.registerRobot) — сразу в список,
@@ -114,7 +141,7 @@ export const useRobotsStore = defineStore('robots', () => {
   }
 
   return {
-    robots, counts, totalBattery,
+    robots, counts, byState, totalBattery,
     addRobot, mergeRobots, removeRobot, applyTelemetry,
     pollingActive, lastPollAt, lastPollError,
     startPolling, stopPolling,
