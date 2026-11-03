@@ -28,7 +28,6 @@ const STATUS_COLORS = {
   idle: '#94a3b8',
   error: '#ef4444',
   offline: '#64748b',
-  teleop: '#8b5cf6',
   deploying: '#f97316',
 }
 

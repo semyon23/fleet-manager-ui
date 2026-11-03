@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1b2d"/>
+      <stop offset="1" stop-color="#16324f"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="wordmark" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#bfdbfe"/>
+      <stop offset="1" stop-color="#60a5fa"/>
+    </linearGradient>
+    <pattern id="mapgrid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0H0V20" fill="none" stroke="#63b3ed" stroke-opacity="0.08" stroke-width="1"/>
+    </pattern>
+
+    <!-- AMR, top view, centered at (0, 0), heading +x -->
+    <g id="robot">
+      <rect x="-14" y="-10" width="28" height="20" rx="5" fill="#e2e8f0" stroke="#63b3ed" stroke-width="1.5"/>
+      <rect x="-10" y="-4" width="12" height="8" rx="1.5" fill="#cbd5e1"/>
+      <circle cx="8" cy="0" r="3.2" fill="#2d3748"/>
+    </g>
+  </defs>
+
+  <rect width="1200" height="360" rx="18" fill="url(#bg)"/>
+  <rect width="1200" height="360" rx="18" fill="url(#grid)"/>
+
+  <!-- ============================ browser window ============================ -->
+  <rect x="540" y="34" width="624" height="292" rx="12" fill="#0b1422" stroke="#334155" stroke-width="1.5"/>
+  <path d="M552 34H1152A12 12 0 0 1 1164 46V62H540V46A12 12 0 0 1 552 34Z" fill="#1e293b"/>
+  <g fill="#475569">
+    <circle cx="558" cy="48" r="4"/>
+    <circle cx="572" cy="48" r="4"/>
+    <circle cx="586" cy="48" r="4"/>
+  </g>
+  <rect x="610" y="41" width="230" height="14" rx="7" fill="#0f172a"/>
+  <text x="622" y="51.5" fill="#94a3b8" font-size="9.5">localhost / fleet-manager / live</text>
+
+  <!-- top bar of the app: logo + connection dot + clock -->
+  <text x="606" y="80" fill="url(#wordmark)" font-size="11" font-weight="700" letter-spacing="2">COMPASS</text>
+  <rect x="683" y="70" width="1.5" height="12" fill="#f97316"/>
+  <text x="690" y="80" fill="#94a3b8" font-size="7.5" font-weight="600" letter-spacing="1.2">FLEET CONTROL</text>
+  <circle cx="1100" cy="77" r="3.5" fill="#22c55e"/>
+  <text x="1108" y="80" fill="#94a3b8" font-size="8.5">12 ms</text>
+  <path d="M592 90H1164" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- sidebar -->
+  <rect x="540" y="62" width="52" height="264" fill="#0f172a"/>
+  <g fill="#334155">
+    <rect x="556" y="100" width="20" height="20" rx="5"/>
+    <rect x="556" y="160" width="20" height="20" rx="5"/>
+    <rect x="556" y="190" width="20" height="20" rx="5"/>
+    <rect x="556" y="220" width="20" height="20" rx="5"/>
+    <rect x="556" y="250" width="20" height="20" rx="5"/>
+  </g>
+  <rect x="556" y="130" width="20" height="20" rx="5" fill="#1d4ed8"/>
+
+  <!-- live map -->
+  <rect x="604" y="100" width="330" height="214" rx="8" fill="#0f1b2d" stroke="#1e293b"/>
+  <rect x="604" y="100" width="330" height="214" rx="8" fill="url(#mapgrid)"/>
+  <g stroke="#a0c4e8" stroke-opacity="0.3" stroke-width="3" stroke-linecap="round" fill="none">
+    <path d="M640 140H900M640 210H900M640 280H900"/>
+    <path d="M640 140V280M770 140V280M900 140V280"/>
+  </g>
+  <path d="M705 210H900V150" fill="none" stroke="#63b3ed" stroke-width="3.5" stroke-linejoin="round"/>
+  <g fill="#1e293b" stroke="#a0c4e8" stroke-width="1.5">
+    <circle cx="640" cy="140" r="4"/><circle cx="705" cy="140" r="4"/><circle cx="770" cy="140" r="4"/>
+    <circle cx="835" cy="140" r="4"/><circle cx="900" cy="140" r="4"/>
+    <circle cx="640" cy="210" r="4"/><circle cx="705" cy="210" r="4"/><circle cx="770" cy="210" r="4"/>
+    <circle cx="835" cy="210" r="4"/><circle cx="900" cy="210" r="4"/>
+    <circle cx="640" cy="280" r="4"/><circle cx="705" cy="280" r="4"/><circle cx="770" cy="280" r="4"/>
+    <circle cx="835" cy="280" r="4"/><circle cx="900" cy="280" r="4"/>
+  </g>
+  <!-- stations: charger, pick -->
+  <rect x="619" y="262" width="16" height="16" rx="4" fill="#15803d"/>
+  <path d="M628 264L623 271H627L626 276L631 269H627Z" fill="#ffffff"/>
+  <rect x="905" y="122" width="16" height="16" rx="4" fill="#ea580c"/>
+  <rect x="909" y="127" width="8" height="6" rx="1" fill="#ffffff"/>
+
+  <g transform="translate(705 210)"><use href="#robot"/></g>
+  <g transform="translate(835 280) rotate(180)"><use href="#robot"/></g>
+  <g transform="translate(640 175) rotate(-90)"><use href="#robot"/></g>
+  <g font-size="9" font-weight="600" text-anchor="middle">
+    <text x="705" y="198" fill="#63b3ed">amr-01</text>
+    <text x="835" y="300" fill="#eab308">amr-02</text>
+    <text x="660" y="160" fill="#94a3b8" text-anchor="start">amr-03</text>
+  </g>
+
+  <!-- robots table -->
+  <rect x="946" y="100" width="206" height="214" rx="8" fill="#0f1b2d" stroke="#1e293b"/>
+  <text x="958" y="120" fill="#e2e8f0" font-size="11" font-weight="600">Robots</text>
+  <g font-size="9">
+    <g transform="translate(958 136)">
+      <text y="11" fill="#cbd5e1" font-family="monospace">amr-01</text>
+      <rect x="64" y="1" width="40" height="14" rx="7" fill="#22c55e"/>
+      <text x="84" y="11" fill="#ffffff" font-weight="600" text-anchor="middle">BUSY</text>
+      <rect x="114" y="5" width="60" height="5" rx="2.5" fill="#1e293b"/>
+      <rect x="114" y="5" width="48" height="5" rx="2.5" fill="#22c55e"/>
+    </g>
+    <g transform="translate(958 164)">
+      <text y="11" fill="#cbd5e1" font-family="monospace">amr-02</text>
+      <rect x="64" y="1" width="62" height="14" rx="7" fill="#eab308"/>
+      <text x="95" y="11" fill="#ffffff" font-weight="600" text-anchor="middle">CHARGING</text>
+      <rect x="132" y="5" width="42" height="5" rx="2.5" fill="#1e293b"/>
+      <rect x="132" y="5" width="12" height="5" rx="2.5" fill="#ef4444"/>
+    </g>
+    <g transform="translate(958 192)">
+      <text y="11" fill="#cbd5e1" font-family="monospace">amr-03</text>
+      <rect x="64" y="1" width="66" height="14" rx="7" fill="#64748b"/>
+      <text x="97" y="11" fill="#ffffff" font-weight="600" text-anchor="middle">NOT_READY</text>
+    </g>
+    <text x="1022" y="224" fill="#94a3b8" font-size="8">not localized</text>
+    <g transform="translate(958 236)">
+      <text y="11" fill="#cbd5e1" font-family="monospace">amr-04</text>
+      <rect x="64" y="1" width="52" height="14" rx="7" fill="#334155"/>
+      <text x="90" y="11" fill="#cbd5e1" font-weight="600" text-anchor="middle">OFFLINE</text>
+    </g>
+  </g>
+  <rect x="958" y="276" width="92" height="22" rx="6" fill="#1d4ed8"/>
+  <text x="1004" y="291" fill="#ffffff" font-size="9.5" font-weight="600" text-anchor="middle">+ Register robot</text>
+
+  <!-- ============================ title ============================ -->
+  <g id="brand">
+    <text x="56" y="64" fill="url(#wordmark)" font-size="24" font-weight="700" letter-spacing="4.5">COMPASS</text>
+    <rect x="219" y="42" width="3" height="26" rx="1.5" fill="#f97316"/>
+    <g fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="2.2">
+      <text x="232" y="53">FLEET</text>
+      <text x="232" y="67">CONTROL</text>
+    </g>
+  </g>
+  <text x="56" y="140" fill="#ffffff" font-size="50" font-weight="700">Fleet UI</text>
+  <text x="58" y="182" fill="#a0c4e8" font-size="21">web UI of the fms: robots, live map,</text>
+  <text x="58" y="210" fill="#a0c4e8" font-size="21">map editor, missions and alarms</text>
+  <g font-size="14" font-weight="600" text-anchor="middle">
+    <rect x="58" y="236" width="70" height="28" rx="14" fill="#4fd1c5" fill-opacity="0.15" stroke="#4fd1c5"/>
+    <text x="93" y="255" fill="#4fd1c5">Vue 3</text>
+    <rect x="138" y="236" width="64" height="28" rx="14" fill="#63b3ed" fill-opacity="0.15" stroke="#63b3ed"/>
+    <text x="170" y="255" fill="#63b3ed">Vite</text>
+    <rect x="212" y="236" width="92" height="28" rx="14" fill="#a0c4e8" fill-opacity="0.15" stroke="#a0c4e8"/>
+    <text x="258" y="255" fill="#a0c4e8">naive-ui</text>
+    <rect x="314" y="236" width="72" height="28" rx="14" fill="#f6ad55" fill-opacity="0.15" stroke="#f6ad55"/>
+    <text x="350" y="255" fill="#f6ad55">MQTT</text>
+  </g>
+</svg>

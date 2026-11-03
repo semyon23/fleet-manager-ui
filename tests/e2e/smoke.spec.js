@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-const ROUTES = ['dashboard', 'live', 'maps', 'robots', 'missions', 'alarms', 'teleop', 'settings']
+const ROUTES = ['dashboard', 'live', 'maps', 'robots', 'missions', 'alarms', 'settings']
 
 test.describe('Smoke: все роуты рендерятся без ошибок', () => {
   for (const route of ROUTES) {

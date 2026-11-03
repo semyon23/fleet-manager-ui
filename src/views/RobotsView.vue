@@ -24,7 +24,6 @@ const statusColor = {
   idle: '#64748b',
   error: '#ef4444',
   offline: '#94a3b8',
-  teleop: '#8b5cf6',
   deploying: '#f97316',
 }
 const statusOptions = [
@@ -33,7 +32,6 @@ const statusOptions = [
   { label: 'Idle', value: 'idle' },
   { label: 'Error', value: 'error' },
   { label: 'Offline', value: 'offline' },
-  { label: 'Teleop', value: 'teleop' },
   { label: 'Deploying', value: 'deploying' },
 ]
 
@@ -55,14 +53,14 @@ const selectedRobot = computed(() =>
 function openDrawer(id) {
   selectedId.value = id
   showDrawer.value = true
+}
+
 // === Ошибки: по code из ответа (контракт v2, раздел 2.1), без HTTP-кодов в UI ===
 function connectionErrorText(e) {
   if (e?.code === 'NETWORK') return 'No connection to the server'
   if (e?.code === 'TIMEOUT') return 'The server is not responding'
   if (e?.code === 'UNAVAILABLE') return 'The fleet service is temporarily unavailable, try again'
   return null
-}
-
 }
 
 // === Delete ===

@@ -10,7 +10,6 @@ const routes = [
   { path: '/missions', name: 'missions', component: () => import('../views/MissionsView.vue'), meta: { title: 'Missions' } },
   { path: '/alarms', name: 'alarms', component: () => import('../views/AlarmsView.vue'), meta: { title: 'Alarms' } },
   { path: '/alerts', redirect: '/alarms' },
-  { path: '/teleop', name: 'teleop', component: () => import('../views/TeleopView.vue'), meta: { title: 'Teleop' } },
   { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue'), meta: { title: 'Settings' } },
 ]
 

@@ -1,44 +1,105 @@
-# Fleet Manager
+<p align="center">
+  <img src="docs/banner.svg" alt="Fleet UI — web UI of the fms: robots, live map, map editor, missions and alarms" width="100%">
+</p>
 
-Web UI for controlling a fleet of industrial AMR / AGV robots via **VDA5050** protocol.
-Backend by [@Semen23](https://github.com/Semen23) (C++). Frontend by [@DDmsngr](https://github.com/DDmsngr) (Vue 3).
+# Fleet UI
 
-- **Live:** https://ddmsngr.github.io/fleet-manager/
-- **Docs:** [docs/BRIEF.md](docs/BRIEF.md) · [docs/DECISIONS.md](docs/DECISIONS.md) · [docs/REFERENCES.md](docs/REFERENCES.md) · [docs/SKILLS_AND_TOOLS.md](docs/SKILLS_AND_TOOLS.md)
+**Веб-интерфейс fms — системы управления парком мобильных роботов.**
 
-## Stack
+Оператор видит роботов и их готовность к работе, следит за ними на карте, рисует карты с графом маршрутов,
+создаёт миссии и разбирает тревоги. Сам UI ничего не решает: действия он отправляет в fms, данные читает
+из fms, а живую позу роботов берёт напрямую из MQTT-брокера.
 
-- Vue 3 + Vite + Pinia + Vue Router
-- Tailwind CSS v4
-- Naive UI (components)
-- Konva.js (map canvas — planned)
-- `vda-5050-lib` (VDA5050 message types)
-- `nipplejs` (teleop joystick — planned)
+> **Идёт переход на контракт API v2** ([`docs/API_CONTRACT.md`](docs/API_CONTRACT.md)). Роботы уже ходят
+> в fms по v2: регистрация, удаление, список со статусом. Дальше — экран роботов на `availability`,
+> MQTT `amr/v3`, затем карты, миссии и тревоги — по мере того как их сделает fms (пока mock и `localStorage`).
 
-## Dev
+## Как устроено
+
+```mermaid
+flowchart LR
+    ui[Fleet UI<br/>браузер] -- "REST /api" --> gw[шлюз nginx]
+    gw -- "GET: списки, карточки" --> db[fleet_database]
+    gw -- "действия, /api/health" --> control[fleet_control]
+    ui -. "MQTT over WebSocket, только чтение" .-> broker[(MQTT-брокер)]
+    broker --- robots[роботы]
+```
+
+- **Один адрес.** UI знает только `apiBaseUrl` (`http://<машина>:8080/api`), разводку по сервисам делает
+  шлюз fms (`deploy/` в репозитории fms).
+- **Чтение** — опросом REST: роботы раз в 5 с, пауза, пока вкладка скрыта.
+- **Действия** (зарегистрировать, удалить, пауза) — через fleet_control; результат виден при следующем опросе.
+- **Живая поза** (5–10 Гц) — напрямую из брокера: топики `visualization` и `connection` каждого робота.
+  Публиковать в брокер UI ничего не может: у его пользователя права только на чтение.
+- **Mock-режим** — те же экраны без сервера: каждая функция `src/api/*` в mock-режиме отвечает сама.
+
+## Экраны
+
+| Путь | Что | Данные |
+|---|---|---|
+| `/dashboard` | сводка по парку: сколько роботов в каком состоянии, заряд | fms |
+| `/live` | карта с роботами в реальном времени | fms + MQTT |
+| `/maps`, `/maps/:id` | список карт и редактор: граф, станции, зоны и атрибуты VDA 5050 v3, дороги, импорт и экспорт LIF / Nav2 | пока `localStorage` |
+| `/robots` | парк роботов: регистрация, состояние, удаление | fms |
+| `/missions` | мастер миссии (шаги по узлам карты) и список | пока mock |
+| `/alarms` | тревоги: фильтры, подтверждение | пока mock |
+| `/settings` | адрес fms, mock-режим, тема | |
+
+Ручного управления (teleop) в UI нет: по контракту это делается напрямую с роботом, не через fms.
+
+## Настройка
+
+Адреса задаются в `public/config.js` — после сборки он лежит рядом с `index.html` в `dist/`, его можно править
+без пересборки:
+
+| Поле | Пример | Что |
+|---|---|---|
+| `apiBaseUrl` | `http://192.168.0.105:8080/api` | шлюз fms |
+| `useMocks` | `false` | `true` — без сервера, `null` — как в сборке |
+| `mqttUrl` | `ws://192.168.0.105:9001` | WebSocket-listener брокера; пусто — MQTT выключен |
+| `mqttUser`, `mqttPassword` | `fleet-ui` | пользователь брокера только на чтение ([`docs/MOSQUITTO_SETUP.md`](docs/MOSQUITTO_SETUP.md)) |
+
+Приоритет: переключатель в Settings → `config.js` → `.env.local` (`VITE_API_BASE_URL`, `VITE_USE_MOCKS`) → mock.
+Локальные адреса в git не коммитим: в репозитории `config.js` с пустыми полями.
+
+## Запуск
 
 ```bash
 npm install
+```
+
+```bash
 npm run dev
 ```
 
-## Build
+Откроется `http://localhost:5175/fleet-manager/`. Сборка и её проверка:
 
 ```bash
-npm run build
+npm run build && npm run preview
 ```
 
-Deploys automatically to GitHub Pages on push to `main`.
+Тесты — unit (Vitest) и e2e (Playwright; браузеры для него ставятся один раз командой `npx playwright install`):
 
-## Routes
+```bash
+npm test
+```
 
-| Route | Purpose |
+```bash
+npm run test:e2e
+```
+
+## Стек
+
+Vue 3 · Vite · Pinia · Vue Router · Tailwind CSS v4 · naive-ui · v-network-graph (редактор карт) · Zod (проверка
+ответов сервера) · chart.js · mqtt.js. JavaScript без TypeScript.
+
+## Документы
+
+| Файл | Что |
 |---|---|
-| `/dashboard` | KPI + event feed |
-| `/map` | Live map with real-time robot positions |
-| `/map-editor` | Layout editor with VDA5050 LIF export |
-| `/robots` | Fleet table + per-robot control |
-| `/missions` | Read-only mission telemetry |
-| `/alarms` | Alarms: filters, acknowledge (old `/alerts` redirects here) |
-| `/teleop` | Manual joystick control |
-| `/settings` | Backend connection, users, general |
+| [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) | контракт UI ↔ fms — источник истины для обеих сторон |
+| [`docs/MOSQUITTO_SETUP.md`](docs/MOSQUITTO_SETUP.md) | брокер для UI: WebSocket-listener, пользователь только на чтение |
+| [`docs/SEMYON_QUICKSTART.md`](docs/SEMYON_QUICKSTART.md) | запуск и типичные грабли |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | принятые решения |
+| [`docs/VDA5050_EN.md`](docs/VDA5050_EN.md) | протокол роботов VDA 5050 v3 |
+| [`CLAUDE.md`](CLAUDE.md) | правила работы над репозиторием и устройство кода |

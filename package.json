@@ -23,7 +23,6 @@
     "konva": "^9.3.16",
     "mqtt": "^5.10.3",
     "naive-ui": "^2.40.4",
-    "nipplejs": "^0.10.2",
     "pinia": "^2.3.0",
     "reconnecting-websocket": "^4.4.0",
     "roslib": "^1.4.1",

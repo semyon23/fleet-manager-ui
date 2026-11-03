@@ -13,7 +13,6 @@ const primary = [
   { to: '/robots', label: 'Robots', icon: '◉' },
   { to: '/missions', label: 'Missions', icon: '≡' },
   { to: '/alarms', label: 'Alarms', icon: '!' },
-  { to: '/teleop', label: 'Teleop', icon: '⇔' },
 ]
 const secondary = [{ to: '/settings', label: 'Settings', icon: '⚙' }]
 

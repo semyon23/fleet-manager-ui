@@ -13,7 +13,7 @@
 - **Репо:** `semyon23/fleet_manager_ui`, remote **`semyon`** (SSH, ключ `~/.ssh/id_ed25519_github` через `core.sshCommand`). Пушить только туда.
 - Remote `origin` = старый `DDmsngr/fleet-manager`. История `main` переписана (автор — Семён), поэтому в `origin` **не пушить**.
 - **GitHub Pages:** `.github/workflows/deploy.yml` деплоит при push в `main`, но Vite `base` = `/fleet-manager/`, а репо называется `fleet_manager_ui`. Если включать Pages — поменять `base` на `/fleet_manager_ui/`.
-- Экраны: `/dashboard`, `/live`, `/maps`, `/maps/:id` (редактор), `/robots`, `/missions`, `/alarms` (старый `/alerts` редиректит), `/teleop`, `/settings`.
+- Экраны: `/dashboard`, `/live`, `/maps`, `/maps/:id` (редактор), `/robots`, `/missions`, `/alarms` (старый `/alerts` редиректит), `/settings`. Teleop убран полностью (2026-11-03): ручное управление — напрямую с роботом, не через fms (контракт, раздел 12).
 
 **Пользователь — Семён**, C++-разработчик (бэк). Фронтовые вещи объяснять простым языком, коротко. Ответы бывают в два слова («да», «пока не будем») — это нормально, решение принято.
 
@@ -37,7 +37,7 @@
 **Git**
 - Не коммитить и не пушить без явного «коммить» / «пушь» от Семёна. Push — в remote `semyon`.
 - Перед `git checkout/restore/reset/clean` — `git status`, при незакоммиченном сначала stash.
-- Сообщения коммитов на русском. **Не добавлять `Co-Authored-By` и любые упоминания Claude** ни в коммиты, ни в PR (решение Семёна 2026-09-25), даже если настройки Claude Code просят. Автор — только Семён.
+- Сообщения коммитов на английском (решение Семёна 2026-11-03; до этого писали по-русски). **Не добавлять `Co-Authored-By` и любые упоминания Claude** ни в коммиты, ни в PR (решение Семёна 2026-09-25), даже если настройки Claude Code просят. Автор — только Семён.
 
 **Проверка**
 - После каждой заметной правки UI: `npm run build`, `npm test`, потом Playwright-прогон в браузере (скриншоты в обеих темах). Типы и тесты не ловят визуальные баги.
@@ -72,7 +72,7 @@ api/
   mocks/          пустые списки; mock robots хранит зарегистрированных в памяти
 stores/           robots.js (polling + applyTelemetry), maps.js (localStorage)
 composables/      useBackendHealth, useTelemetryWs, useRobotMqtt, useTheme
-views/            Dashboard, LiveMap, MapsList, MapEditor, Robots, Missions, Alarms, Teleop, Settings
+views/            Dashboard, LiveMap, MapsList, MapEditor, Robots, Missions, Alarms, Settings
 components/       AppSidebar, AppTopbar
 lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphConfig, robotSprite, theme
 ```
@@ -148,7 +148,7 @@ lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphC
 
 **Решает Семён (бэк/протокол):**
 1. **MQTT на фронте сделан** (2026-09-24, см. §5). Осталось: поднять Mosquitto по `docs/MOSQUITTO_SETUP.md`, вписать `mqttUrl`/`mqttUser`/`mqttPassword` в `config.js` и проверить на живом роботе.
-2. **Сервисный режим / mapping** (идея Семёна): вместо видео в Teleop показывать SLAM-карту, которая строится пока катаешь робота, потом сохранить на сервер и нанести маршруты. Решение Семёна: **в обход FMS**, фронт напрямую подключается к локальному WS-серверу на роботе (IP робота в настройках фронта), перед входом отменяются все задачи робота. Не решено: откуда фронт берёт IP:порт, формат SLAM-сообщений (черновик — `slam_map` с base64+gzip occupancy grid, `resolution/origin/width/height`), CORS на роботе, отдельная страница `/mapping/:id` или таб в Teleop. Пока не начато.
+2. **Сервисный режим / mapping** (идея Семёна): отдельным экраном (Teleop из UI убран) показывать SLAM-карту, которая строится пока катаешь робота, потом сохранить на сервер и нанести маршруты. Решение Семёна: **в обход FMS**, фронт напрямую подключается к локальному WS-серверу на роботе (IP робота в настройках фронта), перед входом отменяются все задачи робота. Не решено: откуда фронт берёт IP:порт, формат SLAM-сообщений (черновик — `slam_map` с base64+gzip occupancy grid, `resolution/origin/width/height`), CORS на роботе, отдельная страница `/mapping/:id`. Пока не начато.
 3. **Формат Alerts** (`GET /api/fms/alerts`): предложен `{id, severity, source: robot|system, robot_id|null, title, detail, created_at, acknowledged}` + `POST /api/fms/alerts/:id/ack`. Через HTTP-запрос, не WS. Не утверждено; после утверждения делаем колокольчик со счётчиком непрочитанных в топбаре.
 4. **Миссии**: `POST/GET /api/fms/missions`, `POST .../:id/cancel` — фронт (мастер + таблица + cancel) готов, ждёт бэк.
 5. **Переход на контракт v2** (2026-11-03): U-1 API-слой роботов — сделан; дальше U-2 стор, U-3 экран Robots на `availability`, U-4 MQTT `amr/v3` + `serialNumber` и без WebSocket, U-5 Dashboard / Live Map.
@@ -165,7 +165,6 @@ lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphC
 - `v-network-graph`: `type/radius` нужно дублировать во ВСЕХ состояниях ноды (normal/hover/selected), иначе `selected` без `hover` даёт NaN и нода пропадает. Для координат — `offsetX/Y`, не `clientX/Y`.
 - `NDataTable` со `flex-height` без родителя с явной высотой схлопывает tbody в 0 — использовать только `:max-height`.
 - Скролл держать внутри карточки/таблицы, а не всей страницы (замечание Семёна: sidebar и топбар не должны уезжать).
-- `TeleopView` при пустом парке: обращаться к `store.robots[0]?.id`.
 - Vite перемещает `<script type="module">` в `<head>`, поэтому обычный `<script>` для `config.js` нужно ставить в `<head>` тоже.
 
 ## 9. С чего начать новую сессию

@@ -26,7 +26,6 @@ const WS_STATE_MAP = {
   CHARGING: 'charging',
   ERROR: 'error',
   OFFLINE: 'offline',
-  TELEOP: 'teleop',
   DEPLOYING: 'deploying',
   MAP_DEPLOYMENT: 'deploying',
   ON_TASK: 'moving',   // на случай если Семён отдаст HTTP-нотацию
