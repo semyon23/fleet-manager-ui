@@ -92,7 +92,9 @@ lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphC
 - Live Map показывает робота только если его `mapId` совпадает с именем/id активной карты (или mapId ещё не пришёл).
 - `positionInitialized === false` → жёлтый тег **not calibrated** в таблице и drawer (на карте не отмечаем).
 
-**Индикатор соединения** (`useBackendHealth`): ping `GET /api/health` каждые 3 с, таймаут 2 с. Зелёный (<2 с), жёлтый (медленно), красный (3 провала подряд), пульсирующий оранжевый (mock). Показан в топбаре (кружок + мс) и в сайдбаре. Судя по скринам от 19.09 `/api/health` уже работает (14 ms).
+**Индикатор соединения** (`useBackendHealth`): ping `GET /api/health` каждые 3 с, таймаут 2 с. Зелёный (<2 с), жёлтый (медленно), красный (3 провала подряд), пульсирующий оранжевый (mock). Показан в топбаре (кружок + мс). Судя по скринам от 19.09 `/api/health` уже работает (14 ms).
+
+**Оформление как в Compass** (`~/compass/compass-ui`, 2026-10-02): лого `COMPASS │ FLEET CONTROL` (шрифт Michroma, `.wordmark`, акцент `--color-accent`), часы `AppClock` справа в топбаре, сайдбар сворачивается до иконок (кнопка `«`/`»` внизу, уже 1280 px — свёрнут по умолчанию), Settings внизу сайдбара.
 
 **Live Map.** SVG, не Konva. Координаты: `px = 60 + x*25`, отступ 60 px вокруг карты, `viewBox` = размер карты + 120, `preserveAspectRatio="xMidYMid meet"`, высота `calc(100vh - 11rem)`. Zoom 25–500% + pan мышью (drag), `1:1` сбрасывает и то и другое. Роботы `ROBOT_SIZE=32`, waypoints `r=2.5`.
 

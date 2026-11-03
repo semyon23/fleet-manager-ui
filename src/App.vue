@@ -1,6 +1,7 @@
 <script setup>
 import { NConfigProvider, NMessageProvider, darkTheme } from 'naive-ui'
-import { onMounted, onBeforeUnmount, computed } from 'vue'
+import { onMounted, onBeforeUnmount, computed, ref, watch } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
 import AppSidebar from './components/AppSidebar.vue'
 import AppTopbar from './components/AppTopbar.vue'
 import { useRobotsStore } from './stores/robots'
@@ -15,6 +16,11 @@ const naiveTheme = computed(() => (isDark.value ? darkTheme : null))
 const health = useBackendHealth()
 const telemetry = useTelemetryWs()
 const robotMqtt = useRobotMqtt()
+
+// Как в Compass: на экранах уже 1280 px меню по умолчанию свёрнуто до иконок.
+const wide = useMediaQuery('(min-width: 1280px)')
+const collapsed = ref(!wide.value)
+watch(wide, (w) => (collapsed.value = !w))
 
 onMounted(() => {
   // Глобальный polling GET /fms/robots — раз в 5с, только для таблицы Robots.
@@ -42,8 +48,8 @@ onBeforeUnmount(() => {
   <NConfigProvider :theme="naiveTheme" :theme-overrides="themeOverrides">
     <NMessageProvider>
       <div class="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-        <AppSidebar />
-        <div class="flex flex-1 flex-col overflow-hidden">
+        <AppSidebar :collapsed="collapsed" @toggle="collapsed = !collapsed" />
+        <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
           <AppTopbar />
           <main class="flex-1 overflow-auto bg-slate-50 p-6 dark:bg-slate-950">
             <RouterView />
@@ -68,3 +74,4 @@ const themeOverrides = {
 }
 export default { themeOverrides }
 </script>
+
