@@ -67,7 +67,7 @@ npm run test:e2e   # Playwright
 ```
 api/
   client.js       fetch + JWT + auto-refresh + AbortController + ApiError; getBaseUrl/getMockMode
-  schemas.js      Zod; RobotWire + wireToRobot() (wire → внутренний Robot)
+  schemas.js      Zod; RobotV2 (контракт v2, раздел 5.1) + toViewRobot() (Robot v2 → внутренний робот)
   robots.js maps.js missions.js alerts.js auth.js index.js
   mocks/          пустые списки; mock robots хранит зарегистрированных в памяти
 stores/           robots.js (polling + applyTelemetry), maps.js (localStorage)
@@ -77,16 +77,16 @@ components/       AppSidebar, AppTopbar
 lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphConfig, robotSprite, theme
 ```
 
-Внутренний формат Robot (то, что ест UI):
-`{ id, model, status, battery, x, y, theta, positionInitialized, mapId, mission, uptime, sprites }`.
-Статусы: `moving | charging | idle | error | offline | teleop | deploying`.
+Внутренний формат робота (то, что ест UI, строит `toViewRobot`):
+`{ id, name, manufacturer, serialNumber, labels, lifecycle, model, availability{state, reasons}, status, connection, battery, charging, x, y, theta, mapId, positionInitialized, lastNodeId, paused, errors, mission, uptime, sprites }`.
+`status` (цвет, фильтры) пока выводится из `availability.state` переходной таблицей: `moving | charging | idle | error | offline` (U-1, 2026-11-03); на шаге U-3 экраны перейдут на `availability` целиком.
 
 ## 5. Как устроены ключевые вещи
 
 **API-слой и mock.** Все запросы идут через `client.request()`. Каждая функция в `api/*.js` проверяет `getMockMode()` и вместо запроса возвращает мок. Переключение mock ↔ real не требует правок в компонентах.
 
 **Данные роботов — два канала** (решение Семёна 2026-09-08/11):
-- HTTP `GET /api/fms/robots` раз в **5 сек** (глобальный singleton polling в `stores/robots.js`) — снапшот для таблицы: батарея, статус, модель и т.д. Wire-формат вложенный (`name/spec/status{...}`), мапится в плоский Robot через `wireToRobot()`.
+- HTTP `GET /api/fms/robots` раз в **5 сек** (глобальный singleton polling в `stores/robots.js`) — снапшот для таблицы. Формат — `Robot` контракта v2 (`spec + status + availability`), мапится во внутреннего робота через `toViewRobot()`. GET отвечает база fms через шлюз.
 - WebSocket `useTelemetryWs` — только **позиция** `agvPosition {mapId, positionInitialized, x, y, theta}` для Live Map. URL: `config.js.wsUrl`, иначе выводится из `apiBaseUrl` (`http://host:5000/api` → `ws://host:5000`). Нативный WebSocket (не socket.io), авто-reconnect с backoff 1→2→5→10→30 с. В mock-режиме не подключается. ID робота: `msg.robot_id`, иначе `manufacturer-serialNumber`.
 - **MQTT напрямую от брокера** (`useRobotMqtt`, Mosquitto, MQTT over WS, пользователь `fleet-ui` только на чтение — `docs/MOSQUITTO_SETUP.md`). Топики `uagv/v2/<manufacturer>/<name>/visualization` (позиция, применяется раз в кадр) и `.../connection` (не `ONLINE` → offline). Подписка оформляется **после success на `POST /fms/robots`** (manufacturer из формы, пустой → `+`), отписка после удаления, после F5 — досподписка по `GET /fms/robots`. Пустой `mqttUrl` или mock → выключено.
 - Live Map показывает робота только если его `mapId` совпадает с именем/id активной карты (или mapId ещё не пришёл).
@@ -131,19 +131,18 @@ lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphC
 
 | Метод | Путь | Заметки |
 |---|---|---|
-| GET | `/api/health` | 200 = ok, используется индикатором |
-| GET | `/api/fms/robots` | массив wire-объектов (не обёртка) |
-| POST | `/api/fms/robots` | body `{name, manufacturer, amr_class}` → `{status:"success", robot_id}`; 409 если имя занято |
-| DELETE | `/api/fms/robots` | body **только `{name}`**; 404 нет, 409 робот активен |
+Бэк — fms (репо `fleet-manager`): шлюз nginx на порту **8080** разводит `GET /api/fms/*` в базу (fleet_database, :8002), остальное — в fleet_control (:8003). У UI один `apiBaseUrl` = `http://<машина>:8080/api` (`deploy/README.md` в репо fms).
 
-Wire-робот: `{name, spec{labels,battery,heartbeat_timeout_seconds,switch_teleop}, status{online, state, battery_level, position_initialized, pose{x,y,theta}, identifier{agv_class,speed_max}, software_version, hardware_version{manufacturer,serial_number}, info_messages, errors}}`.
+| Метод | Путь | Заметки |
+|---|---|---|
+| GET | `/api/health` | `{status: OK\|DEGRADED, services: {control, database, dispatch}}`, всегда 200, пока жив control |
+| GET | `/api/fms/robots`, `/api/fms/robots/:id` | `Robot` контракта v2 (список — массив без обёртки, вместе с `PENDING_DELETE`) |
+| POST | `/api/fms/robots` | `{id, name?, manufacturer, serialNumber, labels?}` → 201 `Robot`; 409 `ALREADY_EXISTS` (занят id или пара manufacturer + serialNumber); 400 `INVALID_INPUT` с `details` по полям |
+| PATCH | `/api/fms/robots/:id` | `{name?, labels?}` → `Robot`; id/manufacturer/serialNumber не меняются (400) |
+| DELETE | `/api/fms/robots/:id[?force=true]` | 202 `Robot` (`PENDING_DELETE`); 409 `ROBOT_BUSY`, если у робота миссия и нет `force` |
+| POST | `/api/fms/robots/:id/pause`, `/resume` | 202 — команда отправлена, факт — `status.paused` при следующем опросе |
 
-`status.state` (HTTP): `IDLE→idle, ERROR→error, ON_TASK→moving, CHARGING→charging, MAP_DEPLOYMENT→deploying, TELEOP→teleop`; если `online=false` → `offline`.
-
-**Ловушки бэка:**
-- Пустые коллекции сериализуются как `{}`, не `[]` → в Zod для `errors`/`info_messages` стоит `z.any()`. Не ужесточать.
-- **CORS** для Boost.Beast: нужен обработчик `OPTIONS` (204 + `Access-Control-Allow-Origin/Methods/Headers`) и те же заголовки на всех ответах, иначе POST с `Content-Type: application/json` падает на preflight. Сейчас работает.
-- Обёртку `{status:"success", ...}` в ответе register Семён оставил как есть.
+Ошибки — `{code, message, details}` (контракт, раздел 2.1); в UI тексты выбираются по `code`, не по HTTP-коду. CORS и `OPTIONS` (204) сервер fms делает сам.
 
 ## 7. Открытые вопросы и очередь
 
@@ -152,7 +151,7 @@ Wire-робот: `{name, spec{labels,battery,heartbeat_timeout_seconds,switch_te
 2. **Сервисный режим / mapping** (идея Семёна): вместо видео в Teleop показывать SLAM-карту, которая строится пока катаешь робота, потом сохранить на сервер и нанести маршруты. Решение Семёна: **в обход FMS**, фронт напрямую подключается к локальному WS-серверу на роботе (IP робота в настройках фронта), перед входом отменяются все задачи робота. Не решено: откуда фронт берёт IP:порт, формат SLAM-сообщений (черновик — `slam_map` с base64+gzip occupancy grid, `resolution/origin/width/height`), CORS на роботе, отдельная страница `/mapping/:id` или таб в Teleop. Пока не начато.
 3. **Формат Alerts** (`GET /api/fms/alerts`): предложен `{id, severity, source: robot|system, robot_id|null, title, detail, created_at, acknowledged}` + `POST /api/fms/alerts/:id/ack`. Через HTTP-запрос, не WS. Не утверждено; после утверждения делаем колокольчик со счётчиком непрочитанных в топбаре.
 4. **Миссии**: `POST/GET /api/fms/missions`, `POST .../:id/cancel` — фронт (мастер + таблица + cancel) готов, ждёт бэк.
-5. Уточнить у Семёна, что именно добавится в HTTP-state (после перехода на VDA5050) — обновить `RobotWire`/`wireToRobot`.
+5. **Переход на контракт v2** (2026-11-03): U-1 API-слой роботов — сделан; дальше U-2 стор, U-3 экран Robots на `availability`, U-4 MQTT `amr/v3` + `serialNumber` и без WebSocket, U-5 Dashboard / Live Map.
 
 **Решено «нет» / отложено:** кнопка `initPosition` (обнуление позиции) — «пока не будем»; мобильная вёрстка — «пока нет»; e2e в CI — «не знаю» (не решено).
 

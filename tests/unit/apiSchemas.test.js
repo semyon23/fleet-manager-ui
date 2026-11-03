@@ -19,20 +19,6 @@ describe('API schemas — happy path', () => {
     expect(ok.success).toBe(true)
   })
 
-  it('Robot rejects battery > 100', () => {
-    const bad = S.Robot.safeParse({
-      id: 'r', model: 'T', status: 'idle', battery: 120, x: 0, y: 0, theta: 0,
-    })
-    expect(bad.success).toBe(false)
-  })
-
-  it('Robot rejects unknown status', () => {
-    const bad = S.Robot.safeParse({
-      id: 'r', model: 'T', status: 'flying', battery: 50, x: 0, y: 0, theta: 0,
-    })
-    expect(bad.success).toBe(false)
-  })
-
   it('Mission requires createdAt as ISO', () => {
     const bad = S.Mission.safeParse({
       id: 'M', name: 'x', mapId: 'm', status: 'pending',
@@ -66,49 +52,67 @@ describe('API schemas — happy path', () => {
   })
 })
 
-describe('RobotWire → Robot mapper', () => {
-  const wire = {
-    name: 'amr-01',
-    spec: { labels: [], battery: { critical_level: 20 } },
+describe('Robot v2 (контракт, раздел 5.1) → внутренний робот', () => {
+  // Как его отдаёт база fms (GET /fms/robots/:id)
+  const robot = {
+    id: 'amr-01', name: 'AMR 01', manufacturer: 'ktc', serialNumber: 'amr1', labels: { zone: 'A' },
+    lifecycle: 'ACTIVE', createdAt: '2026-11-03T19:47:59.396Z', updatedAt: '2026-11-03T19:47:59.396Z',
     status: {
-      online: true,
-      state: 'ON_TASK',
-      battery_level: 78.4,
-      pose: { x: 12.4, y: 8.2, theta: 1.57 },
-      identifier: { agv_class: 'CARRIER', speed_max: 1.5 },
-      hardware_version: { manufacturer: 'SomeCorp', serial_number: 'SN1' },
-      software_version: { os: 'Linux', app: '1.0' },
-      info_messages: [],
-      errors: [],
+      connection: 'ONLINE', operatingMode: 'AUTOMATIC',
+      pose: { x: 12.4, y: 8.2, theta: 1.57, mapId: 'map_1' }, localized: true, lastNodeId: 'n7',
+      driving: false, paused: false,
+      power: { stateOfCharge: 78.4, charging: false, voltage: 48, range: null },
+      safety: { emergencyStop: 'NONE', fieldViolation: false },
+      errors: [{ errorType: 'noRoute', level: 'WARNING', description: 'x', hint: '', references: { nodeId: 'n8' } }],
+      loads: [], missionId: 'm-102',
+      factsheetReceivedAt: '2026-11-03T19:47:59.000Z', lastStateAt: '2026-11-03T19:47:59.606Z',
     },
+    availability: { state: 'BUSY', reasons: [] },
+    graphPosition: null,
+    info: null,
   }
 
-  it('parses wire schema', () => {
-    expect(S.RobotWire.safeParse(wire).success).toBe(true)
+  it('parses a full robot', () => {
+    expect(S.RobotV2.safeParse(robot).success).toBe(true)
   })
 
-  it('maps ON_TASK → moving, rounds battery, joins model', () => {
-    const r = S.wireToRobot(wire)
+  it('parses a robot without status and availability (nothing from the robot yet)', () => {
+    expect(S.RobotV2.safeParse({ ...robot, status: null, availability: null }).success).toBe(true)
+  })
+
+  it('rejects an unknown availability state and lifecycle', () => {
+    expect(S.RobotV2.safeParse({ ...robot, availability: { state: 'FLYING', reasons: [] } }).success).toBe(false)
+    expect(S.RobotV2.safeParse({ ...robot, lifecycle: 'GONE' }).success).toBe(false)
+  })
+
+  it('maps to the internal robot', () => {
+    const r = S.toViewRobot(S.RobotV2.parse(robot))
     expect(r.id).toBe('amr-01')
+    expect(r.name).toBe('AMR 01')
+    expect(r.serialNumber).toBe('amr1')
+    expect(r.availability.state).toBe('BUSY')
     expect(r.status).toBe('moving')
     expect(r.battery).toBe(78)
     expect(r.x).toBe(12.4)
-    expect(r.model).toBe('SomeCorp · CARRIER')
+    expect(r.mapId).toBe('map_1')
+    expect(r.mission).toBe('m-102')
+    expect(r.connection).toBe('ONLINE')
+    expect(r.positionInitialized).toBe(true)
   })
 
-  it('offline overrides state when status.online=false', () => {
-    const r = S.wireToRobot({ ...wire, status: { ...wire.status, online: false } })
+  it('robot without status and availability is offline', () => {
+    const r = S.toViewRobot({ ...robot, status: null, availability: null })
     expect(r.status).toBe('offline')
+    expect(r.battery).toBe(0)
+    expect(r.mission).toBe(null)
+    expect(r.connection).toBe('UNKNOWN')
   })
 
-  it('maps MAP_DEPLOYMENT and TELEOP correctly', () => {
-    expect(S.wireToRobot({ ...wire, status: { ...wire.status, state: 'MAP_DEPLOYMENT' } }).status).toBe('deploying')
-    expect(S.wireToRobot({ ...wire, status: { ...wire.status, state: 'TELEOP' } }).status).toBe('teleop')
-  })
-
-  it('unknown state falls back to idle', () => {
-    const r = S.wireToRobot({ ...wire, status: { ...wire.status, state: 'FLYING' } })
-    expect(r.status).toBe('idle')
+  it('register request checks the id like the server does', () => {
+    const ok = { id: 'amr-01', manufacturer: 'ktc', serialNumber: 'amr1' }
+    expect(S.RegisterRobotRequest.safeParse(ok).success).toBe(true)
+    expect(S.RegisterRobotRequest.safeParse({ ...ok, id: 'with space' }).success).toBe(false)
+    expect(S.RegisterRobotRequest.safeParse({ ...ok, serialNumber: '' }).success).toBe(false)
   })
 })
 

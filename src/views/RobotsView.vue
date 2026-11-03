@@ -55,17 +55,21 @@ const selectedRobot = computed(() =>
 function openDrawer(id) {
   selectedId.value = id
   showDrawer.value = true
+// === Ошибки: по code из ответа (контракт v2, раздел 2.1), без HTTP-кодов в UI ===
+function connectionErrorText(e) {
+  if (e?.code === 'NETWORK') return 'No connection to the server'
+  if (e?.code === 'TIMEOUT') return 'The server is not responding'
+  if (e?.code === 'UNAVAILABLE') return 'The fleet service is temporarily unavailable, try again'
+  return null
+}
+
 }
 
 // === Delete ===
 function deleteErrorText(e, name) {
-  if (e?.status === 404) return `Robot "${name}" is already deleted or not in the system`
-  if (e?.status === 409) return `Robot "${name}" is currently active — stop it first, then delete`
-  if (e?.status === 400) return 'Failed to delete — invalid request'
-  if (e?.status === 0 || e?.code === 'NETWORK') return 'No connection to the backend'
-  if (e?.code === 'TIMEOUT') return 'Backend is not responding'
-  if (e?.status >= 500) return 'Backend error'
-  return e?.message || `Failed to delete robot "${name}"`
+  if (e?.code === 'NOT_FOUND') return `Robot "${name}" is already deleted`
+  if (e?.code === 'ROBOT_BUSY') return `Robot "${name}" is executing a mission — wait for it to finish`
+  return connectionErrorText(e) || `Failed to delete robot "${name}"`
 }
 async function deleteRobot(id) {
   try {
@@ -147,51 +151,42 @@ const tableMaxHeight = 'calc(100vh - 14rem)'
 // === Register robot modal ===
 const showRegister = ref(false)
 const submitting = ref(false)
-const form = ref({ name: '', manufacturer: '', amr_class: 'CARRIER' })
-
-const amrClassOptions = [
-  { label: 'CARRIER — cargo cart', value: 'CARRIER' },
-  { label: 'FORKLIFT — forklift', value: 'FORKLIFT' },
-  { label: 'TUGGER — tugger', value: 'TUGGER' },
-  { label: 'TOWING — towing', value: 'TOWING' },
-  { label: 'MOBILE_ROBOT — other AMR', value: 'MOBILE_ROBOT' },
-]
+// id — латиница, цифры, - и _ (контракт v2, 5.2); manufacturer и serialNumber — как в настройках самого робота
+const emptyForm = () => ({ id: '', name: '', manufacturer: '', serialNumber: '' })
+const form = ref(emptyForm())
+const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 
 function openRegister() {
-  form.value = { name: '', manufacturer: '', amr_class: 'CARRIER' }
+  form.value = emptyForm()
   showRegister.value = true
 }
 
-function registerErrorText(e, name) {
-  if (e?.status === 409) return `A robot named "${name}" already exists in the system`
-  if (e?.status === 400) return 'Invalid data — check the robot name and try again'
-  if (e?.status === 0 || e?.code === 'NETWORK') return 'No connection to the backend — check that the server is running'
-  if (e?.code === 'TIMEOUT') return 'Backend is not responding'
-  if (e?.status >= 500) return 'Backend error, please try again later'
-  return e?.message || 'Failed to register the robot'
+// Понятные подписи полей для сообщений из details
+const FIELD_LABELS = { id: 'ID', name: 'Name', manufacturer: 'Manufacturer', serialNumber: 'Serial number', labels: 'Labels' }
+
+function registerErrorText(e, id) {
+  if (e?.code === 'ALREADY_EXISTS') return `Robot "${id}" or a robot with this manufacturer and serial number is already registered`
+  if (e?.code === 'INVALID_INPUT' && e.details && Object.keys(e.details).length) {
+    return Object.entries(e.details).map(([field, why]) => `${FIELD_LABELS[field] || field}: ${why}`).join('; ')
+  }
+  return connectionErrorText(e) || 'Failed to register the robot'
 }
 
 async function submitRegister() {
-  if (!form.value.name.trim()) return msg.error('Name is required')
+  const values = Object.fromEntries(Object.entries(form.value).map(([k, v]) => [k, v.trim()]))
+  if (!ID_PATTERN.test(values.id)) return msg.error('ID: 1–64 characters, letters, digits, - or _')
+  if (!values.manufacturer) return msg.error('Manufacturer is required')
+  if (!values.serialNumber) return msg.error('Serial number is required')
   submitting.value = true
-  const name = form.value.name.trim()
   try {
-    const manufacturer = form.value.manufacturer.trim()
-    const resp = await api.robots.registerRobot({
-      name,
-      manufacturer,
-      amr_class: form.value.amr_class,
-    })
-    store.addRobot({ ...form.value, name, manufacturer })
-    // Бэк подтвердил регистрацию → подписываемся на MQTT-топики робота
-    // (uagv/v2/<manufacturer>/<name>/visualization|connection).
-    subscribeRobot(resp.robot_id || name, manufacturer)
-    msg.success(api.getMockMode()
-      ? `Robot "${resp.robot_id}" registered (mock)`
-      : `Robot "${resp.robot_id}" registered`)
+    const robot = await api.robots.registerRobot(values)
+    store.addRobot(robot)
+    // Робот зарегистрирован → подписка на его MQTT-топики (переделаем на amr/v3 и serialNumber в U-4)
+    subscribeRobot(robot.id, robot.manufacturer)
+    msg.success(api.getMockMode() ? `Robot "${robot.id}" registered (mock)` : `Robot "${robot.id}" registered`)
     showRegister.value = false
   } catch (e) {
-    msg.error(registerErrorText(e, name))
+    msg.error(registerErrorText(e, values.id))
   } finally {
     submitting.value = false
   }
@@ -259,24 +254,30 @@ async function submitRegister() {
     >
       <div class="flex flex-col gap-4">
         <label class="text-sm text-slate-600 dark:text-slate-400">
-          Name (unique id)
-          <NInput v-model:value="form.name" placeholder="amr-10" class="mt-1" />
+          ID
+          <NInput v-model:value="form.id" placeholder="amr-01" class="mt-1" />
         </label>
 
         <label class="text-sm text-slate-600 dark:text-slate-400">
-          Manufacturer <span class="text-slate-400 text-xs">(optional)</span>
-          <NInput v-model:value="form.manufacturer" placeholder="Transporter Corp" class="mt-1" />
+          Name <span class="text-slate-400 text-xs">(optional, defaults to ID)</span>
+          <NInput v-model:value="form.name" placeholder="AMR 01" class="mt-1" />
         </label>
 
-        <label class="text-sm text-slate-600 dark:text-slate-400">
-          AMR class
-          <NSelect v-model:value="form.amr_class" :options="amrClassOptions" size="medium" class="mt-1" />
-        </label>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="text-sm text-slate-600 dark:text-slate-400">
+            Manufacturer
+            <NInput v-model:value="form.manufacturer" placeholder="ktc" class="mt-1" />
+          </label>
+          <label class="text-sm text-slate-600 dark:text-slate-400">
+            Serial number
+            <NInput v-model:value="form.serialNumber" placeholder="amr1" class="mt-1" />
+          </label>
+        </div>
 
         <div class="rounded bg-slate-50 dark:bg-slate-800 p-3 text-xs text-slate-600 dark:text-slate-400">
-          Sends <code>POST /api/fms/robots</code> to the backend. After a success
-          response the robot appears in the list. Position and status will arrive over
-          WebSocket once the robot comes online.
+          Manufacturer and serial number must match the robot's own settings: the fleet finds the robot
+          by them. They cannot be changed later. The robot class comes from the robot itself once it
+          is online.
         </div>
       </div>
 

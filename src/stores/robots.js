@@ -75,19 +75,10 @@ export const useRobotsStore = defineStore('robots', () => {
     pollingActive.value = false
   }
 
-  // Локально добавить только что зарегистрированного робота (после успешного
-  // ответа api.robots.registerRobot). Стартовые значения — offline / 0, дальше
-  // WebSocket от бэка обновит реальную позицию/статус.
-  function addRobot({ name, manufacturer, amr_class }) {
-    robots.value.push({
-      id: name,
-      manufacturer: manufacturer || '',
-      model: manufacturer ? `${manufacturer} · ${amr_class}` : amr_class,
-      sprites: AMR_SPRITES,
-      status: 'offline',
-      battery: 0, x: 0, y: 0, theta: 0,
-      mission: null, uptime: '0h',
-    })
+  // Только что зарегистрированный робот (ответ api.robots.registerRobot) — сразу в список,
+  // не дожидаясь опроса. Статус и готовность догонит следующий опрос.
+  function addRobot(robot) {
+    robots.value.push({ ...robot, sprites: AMR_SPRITES })
   }
 
   // Локально убрать робота по id (после успешного api.robots.deleteRobot).

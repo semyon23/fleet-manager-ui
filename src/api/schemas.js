@@ -145,115 +145,111 @@ export const MapEntity = z.object({
 })
 export const MapList = z.array(MapEntity)
 
-// === Robots ===
-// Внутренние status'ы фронта. Мапятся из RobotState бэка Семёна:
-//   IDLE→idle, ERROR→error, ON_TASK→moving (визуально едет),
-//   CHARGING→charging, MAP_DEPLOYMENT→deploying, TELEOP→teleop.
-// Плюс frontend-only 'offline' когда status.online=false.
-export const RobotStatus = z.enum(['moving', 'charging', 'idle', 'error', 'offline', 'teleop', 'deploying'])
-export const Robot = z.object({
-  id: z.string(),
-  model: z.string(),
-  status: RobotStatus,
-  battery: z.number().min(0).max(100),
-  x: z.number(),
-  y: z.number(),
-  theta: z.number(),
-  mission: z.string().nullable().optional(),
-  uptime: z.string().optional(),
+// === Robots (контракт v2, раздел 5) ===
+// Робот целиком: spec (пишет control) + status (dispatch) + availability (control).
+// Enum'ы из статуса робота (connection, operatingMode, ...) — строки: их значения приходят от робота
+// по VDA 5050, и неизвестное значение не должно ронять весь список.
+export const RobotLifecycle = z.enum(['ACTIVE', 'PENDING_DELETE'])
+export const AvailabilityState = z.enum([
+  'OFFLINE', 'NOT_READY', 'IDLE', 'BUSY', 'CHARGING', 'PAUSED', 'ERROR', 'DELETING',
+])
+export const Availability = z.object({
+  state: AvailabilityState,
+  reasons: z.array(z.object({ code: z.string(), message: z.string() })).default([]),
 })
-export const RobotList = z.array(Robot)
-
-// ==== Wire-format от бэка Семёна (GET /fms/robots) ====
-// Отличается от нашего внутреннего Robot — мапится через wireToRobot().
-// Схема из его кода (2026-08-29):
-export const RobotWire = z.object({
-  name: z.string(),
-  spec: z.object({
-    labels: z.array(z.any()).optional().default([]),
-    battery: z.object({ critical_level: z.number() }).partial().optional(),
-    heartbeat_timeout_seconds: z.number().optional(),
-    switch_teleop: z.boolean().optional(),
-  }).partial().optional(),
-  status: z.object({
-    online: z.boolean(),
-    state: z.string(),                    // строку смэпим в наш enum
-    battery_level: z.number(),
-    position_initialized: z.boolean().optional(),
-    pose: z.object({
-      x: z.number(),
-      y: z.number(),
-      theta: z.number(),
-    }),
-    identifier: z.object({
-      agv_class: z.string().optional(),
-      speed_max: z.number().optional(),
-    }).partial().optional(),
-    software_version: z.object({
-      os: z.string().optional(),
-      app: z.string().optional(),
-    }).partial().optional(),
-    hardware_version: z.object({
-      manufacturer: z.string().optional(),
-      serial_number: z.string().optional(),
-    }).partial().optional(),
-    // У Семёна бэк отдаёт эти два поля то как {} (пустой объект), то как []
-    // — z.any() лояльно, чтобы Zod не валил валидацию из-за формата обёртки.
-    info_messages: z.any().optional(),
-    errors: z.any().optional(),
+export const RobotErrorV2 = z.object({
+  errorType: z.string(),
+  level: z.string(),                       // WARNING | URGENT | CRITICAL | FATAL
+  description: z.string().default(''),
+  hint: z.string().default(''),
+  references: z.record(z.string(), z.string()).default({}),
+})
+export const RobotStatusV2 = z.object({
+  connection: z.string(),                  // UNKNOWN | ONLINE | OFFLINE | HIBERNATING | CONNECTION_BROKEN | STALE
+  operatingMode: z.string(),
+  pose: z.object({ x: z.number(), y: z.number(), theta: z.number(), mapId: z.string() }).nullable(),
+  localized: z.boolean(),
+  lastNodeId: z.string(),
+  driving: z.boolean(),
+  paused: z.boolean(),
+  power: z.object({
+    stateOfCharge: z.number(),
+    charging: z.boolean(),
+    voltage: z.number().nullable(),
+    range: z.number().nullable(),
   }),
+  safety: z.object({ emergencyStop: z.string(), fieldViolation: z.boolean() }),
+  errors: z.array(RobotErrorV2).default([]),
+  loads: z.array(z.object({ loadId: z.string(), loadType: z.string() })).default([]),
+  missionId: z.string().nullable(),
+  factsheetReceivedAt: IsoDateTime.nullable(),
+  lastStateAt: IsoDateTime.nullable(),
 })
-export const RobotWireList = z.array(RobotWire)
+export const RobotV2 = z.object({
+  id: z.string(),
+  name: z.string(),
+  manufacturer: z.string(),
+  serialNumber: z.string(),
+  labels: z.record(z.string(), z.string()).default({}),
+  lifecycle: RobotLifecycle,
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+  status: RobotStatusV2.nullable(),        // null — от робота ещё ничего не было
+  availability: Availability.nullable(),   // null — control ещё не посчитал
+  graphPosition: z.any().nullable(),       // позже, вместе с картами
+  info: z.any().nullable(),                // позже: выжимка из factsheet
+})
+export const RobotV2List = z.array(RobotV2)
 
-// Маппер wire → внутренний Robot, который жрёт UI.
-// STATE_MAP переводит RobotState C++ enum Семёна (2026-08-30) в наш frontend-enum.
-// Если робот offline (status.online=false) — приоритетно ставим 'offline'.
-const STATE_MAP = {
+// POST /fms/robots. manufacturer + serialNumber — как в топиках робота (amr/v3/<manufacturer>/<serialNumber>/…)
+export const RegisterRobotRequest = z.object({
+  id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
+  name: z.string().optional(),
+  manufacturer: z.string().min(1),
+  serialNumber: z.string().min(1),
+  labels: z.record(z.string(), z.string()).optional(),
+})
+
+// Внутренний робот, который ест UI (таблица, карта, дашборд). Строится из RobotV2.
+// status — фронтовое состояние для цвета и фильтров; пока оно выводится из availability
+// (переходная таблица, заменим на availability целиком на шаге U-3).
+const STATE_TO_STATUS = {
+  OFFLINE: 'offline',
+  NOT_READY: 'idle',
   IDLE: 'idle',
-  ERROR: 'error',
-  ON_TASK: 'moving',
+  BUSY: 'moving',
   CHARGING: 'charging',
-  MAP_DEPLOYMENT: 'deploying',
-  TELEOP: 'teleop',
+  PAUSED: 'idle',
+  ERROR: 'error',
+  DELETING: 'offline',
 }
-export function wireToRobot(w) {
-  const rawState = String(w.status.state || '').toUpperCase()
-  const mapped = STATE_MAP[rawState] || 'idle'
-  const status = !w.status.online ? 'offline' : mapped
-  const modelParts = [
-    w.status?.hardware_version?.manufacturer,
-    w.status?.identifier?.agv_class,
-  ].filter(Boolean)
+export function toViewRobot(r) {
+  const s = r.status
   return {
-    id: w.name,
-    model: modelParts.join(' · ') || '—',
-    // Нужен для MQTT-топика uagv/v2/<manufacturer>/<serial>/... (useRobotMqtt)
-    manufacturer: w.status?.hardware_version?.manufacturer || '',
-    status,
-    battery: Math.round(w.status.battery_level ?? 0),
-    x: w.status.pose?.x ?? 0,
-    y: w.status.pose?.y ?? 0,
-    theta: w.status.pose?.theta ?? 0,
-    mission: null,
+    id: r.id,
+    name: r.name,
+    manufacturer: r.manufacturer,
+    serialNumber: r.serialNumber,
+    labels: r.labels,
+    lifecycle: r.lifecycle,
+    model: `${r.manufacturer} · ${r.serialNumber}`,
+    availability: r.availability,          // { state, reasons } или null
+    status: STATE_TO_STATUS[r.availability?.state] || 'offline',
+    connection: s?.connection || 'UNKNOWN',
+    battery: Math.round(s?.power.stateOfCharge ?? 0),
+    charging: s?.power.charging ?? false,
+    x: s?.pose?.x ?? 0,
+    y: s?.pose?.y ?? 0,
+    theta: s?.pose?.theta ?? 0,
+    mapId: s?.pose?.mapId ?? null,
+    positionInitialized: s?.localized ?? false,
+    lastNodeId: s?.lastNodeId || '',
+    paused: s?.paused ?? false,
+    errors: s?.errors ?? [],
+    mission: s?.missionId ?? null,
     uptime: '—',
   }
 }
-export const RobotCommand = z.object({
-  action: z.enum(['pause', 'resume', 'stop', 'home', 'reboot', 'shutdown']),
-})
-
-// POST /fms/robots — регистрация нового робота в fleet.
-// Формат Семёна (2026-08-29): { name, manufacturer, amr_class="CARRIER" (default) }
-export const AmrClass = z.enum(['CARRIER', 'FORKLIFT', 'TUGGER', 'TOWING', 'MOBILE_ROBOT'])
-export const RegisterRobotRequest = z.object({
-  name: z.string().min(1),
-  manufacturer: z.string().default(''),  // Семён: можно пустую строку
-  amr_class: AmrClass.default('CARRIER'),
-})
-export const RegisterRobotResponse = z.object({
-  status: z.literal('success'),
-  robot_id: z.string(),
-})
 
 // === Missions ===
 export const Mission = z.object({
