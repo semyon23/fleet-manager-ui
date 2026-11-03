@@ -203,8 +203,8 @@ async function submitRegister() {
   try {
     const robot = await api.robots.registerRobot(values)
     store.addRobot(robot)
-    // Робот зарегистрирован → подписка на его MQTT-топики (переделаем на amr/v3 и serialNumber в U-4)
-    subscribeRobot(robot.id, robot.manufacturer)
+    // Робот зарегистрирован → подписка на его MQTT-топики (amr/v3/<manufacturer>/<serialNumber>/…)
+    subscribeRobot(robot)
     msg.success(api.getMockMode() ? `Robot "${robot.id}" registered (mock)` : `Robot "${robot.id}" registered`)
     showRegister.value = false
   } catch (e) {

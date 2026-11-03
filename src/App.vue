@@ -7,14 +7,12 @@ import AppTopbar from './components/AppTopbar.vue'
 import { useRobotsStore } from './stores/robots'
 import { useTheme } from './composables/useTheme'
 import { useBackendHealth } from './composables/useBackendHealth'
-import { useTelemetryWs } from './composables/useTelemetryWs'
 import { useRobotMqtt } from './composables/useRobotMqtt'
 
 const robots = useRobotsStore()
 const { isDark } = useTheme()
 const naiveTheme = computed(() => (isDark.value ? darkTheme : null))
 const health = useBackendHealth()
-const telemetry = useTelemetryWs()
 const robotMqtt = useRobotMqtt()
 
 // Как в Compass: на экранах уже 1280 px меню по умолчанию свёрнуто до иконок.
@@ -23,23 +21,18 @@ const collapsed = ref(!wide.value)
 watch(wide, (w) => (collapsed.value = !w))
 
 onMounted(() => {
-  // Глобальный polling GET /fms/robots — раз в 5с, только для таблицы Robots.
-  // Live Map получает координаты быстрее через WS-стрим (см. ниже).
+  // Глобальный опрос GET /fms/robots раз в 5 с: всё, что считает fms (статус, готовность, миссия).
   robots.startPolling()
   // Health-ping /api/health каждые 3 сек — sidebar footer показывает индикатор.
   health.startPing()
-  // WebSocket телеметрия от Семёна: {type:"state", robot_id, data:{x,y,theta,battery,status}}.
-  // В mock-режиме connect() ничего не делает. Авто-reconnect с backoff.
-  telemetry.connect()
-  // MQTT over WS (Mosquitto): позиции + online/offline. Подписки на роботов
-  // оформляются после успешной регистрации (RobotsView) и по poll после F5.
-  // Пустой mqttUrl в config.js или mock-режим → выключено.
+  // MQTT over WS: живая поза и связь роботов напрямую от брокера. Подписки следуют за списком
+  // роботов из опроса. Пустой mqttUrl в config.js или mock-режим → выключено.
+  // WebSocket fms убран (контракт v2): всё остальное — опросом REST.
   robotMqtt.connect()
 })
 onBeforeUnmount(() => {
   robots.stopPolling()
   health.stopPing()
-  telemetry.disconnect()
   robotMqtt.disconnect()
 })
 </script>

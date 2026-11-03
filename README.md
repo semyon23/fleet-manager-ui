@@ -58,6 +58,7 @@ flowchart LR
 | `useMocks` | `false` | `true` — без сервера, `null` — как в сборке |
 | `mqttUrl` | `ws://192.168.0.105:9001` | WebSocket-listener брокера; пусто — MQTT выключен |
 | `mqttUser`, `mqttPassword` | `fleet-ui` | пользователь брокера только на чтение ([`docs/MOSQUITTO_SETUP.md`](docs/MOSQUITTO_SETUP.md)) |
+| `mqttInterface`, `mqttVersion` | пусто | начало топиков роботов; пусто = `amr` / `v3` |
 
 Приоритет: переключатель в Settings → `config.js` → `.env.local` (`VITE_API_BASE_URL`, `VITE_USE_MOCKS`) → mock.
 Локальные адреса в git не коммитим: в репозитории `config.js` с пустыми полями.

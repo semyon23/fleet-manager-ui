@@ -64,7 +64,7 @@ export const useRobotsStore = defineStore('robots', () => {
     try {
       const fresh = await api.robots.listRobots()
       mergeRobots(fresh)
-      // После F5 MQTT-подписки пустые — восстанавливаем по списку с бэка.
+      // Подписки MQTT следуют за списком роботов: новые — подписать, удалённые — отписать.
       const { syncRobots } = await import('../composables/useRobotMqtt')
       syncRobots(fresh)
       lastPollAt.value = new Date()
@@ -113,9 +113,8 @@ export const useRobotsStore = defineStore('robots', () => {
     robots.value = robots.value.filter((r) => r.id !== id)
   }
 
-  // Патч от WS-стрима телеметрии (useTelemetryWs). Только для уже известных
-  // роботов — если робота нет в списке, ждём HTTP-poll его подтянет.
-  // Не меняем sprites/model/mission/uptime — это метаданные, не телеметрия.
+  // Патч от MQTT (useRobotMqtt): поза из visualization, потеря связи из connection.
+  // Только для уже известных роботов — нового подтянет опрос. Остальное не трогаем: это данные fms.
   function applyTelemetry(robotId, patch) {
     const idx = robots.value.findIndex((r) => r.id === robotId)
     if (idx === -1) return
@@ -125,7 +124,9 @@ export const useRobotsStore = defineStore('robots', () => {
       x: patch.x ?? cur.x,
       y: patch.y ?? cur.y,
       theta: patch.theta ?? cur.theta,
-      battery: patch.battery ?? cur.battery,
+      mapId: patch.mapId ?? cur.mapId,
+      connection: patch.connection ?? cur.connection,
+      availability: patch.availability ?? cur.availability,
       status: patch.status ?? cur.status,
     }
   }

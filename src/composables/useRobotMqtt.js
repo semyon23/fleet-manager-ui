@@ -4,42 +4,41 @@ import { getMockMode } from '../api/client'
 import { useRobotsStore } from '../stores/robots'
 
 /**
- * MQTT over WebSocket: позиции и online/offline роботов напрямую от брокера.
- * Схема и ACL: docs/MOSQUITTO_SETUP.md (пользователь fleet-ui, только чтение).
+ * MQTT over WebSocket: живая поза и связь роботов напрямую от брокера (контракт v2, раздел 10).
+ * Только чтение: пользователь брокера fleet-ui (ACL — deploy/mosquitto в репозитории fms).
  *
- * Топики VDA5050 на робота:
- *   uagv/v2/<manufacturer>/<serialNumber>/visualization  → agvPosition {x, y, theta}
- *   uagv/v2/<manufacturer>/<serialNumber>/connection     → connectionState
+ * Топики робота (VDA 5050 v3):
+ *   {interface}/{version}/{manufacturer}/{serialNumber}/visualization → mobileRobotPosition {x, y, theta, mapId}
+ *   {interface}/{version}/{manufacturer}/{serialNumber}/connection    → connectionState
+ * interface / version — mqttInterface / mqttVersion в config.js (по умолчанию amr / v3).
  *
- * serialNumber = name робота (он же robot_id и логин робота в брокере).
- * manufacturer берём из формы регистрации: подписываемся только после того,
- * как бэк ответил success на POST /fms/robots. Пустой manufacturer (бэк это
- * разрешает) → wildcard `+`.
+ * В топике робот — manufacturer + serialNumber, в сторе — его id; связь между ними — карта subscriptions.
+ * Подписки следуют за списком роботов из опроса (syncRobots): новых подписываем, удалённых отписываем.
  *
- * После F5 подписки восстанавливаются из GET /fms/robots (см. syncRobots).
- *
- * Конфиг: window.__FLEET_CONFIG__.mqttUrl / mqttUser / mqttPassword.
- * Пустой mqttUrl или mock-режим → MQTT выключен, позиции идут из WS control.
+ * Конфиг: window.__FLEET_CONFIG__.mqttUrl / mqttUser / mqttPassword. Пустой mqttUrl или mock-режим → выключено.
  */
-
-const INTERFACE = 'uagv'
-const VERSION = 'v2'
 
 function cfg() {
   return (typeof window !== 'undefined' && window.__FLEET_CONFIG__) || {}
 }
 
-function topicsFor(robotId, manufacturer) {
-  const m = (manufacturer && String(manufacturer).trim()) || '+'
-  const base = `${INTERFACE}/${VERSION}/${m}/${robotId}`
+function topicPrefix() {
+  const { mqttInterface, mqttVersion } = cfg()
+  return `${mqttInterface || 'amr'}/${mqttVersion || 'v3'}`
+}
+
+// manufacturer/serialNumber — так робот назван в своих топиках
+const robotKey = (robot) => `${robot.manufacturer}/${robot.serialNumber}`
+
+function topicsFor(key) {
+  const base = `${topicPrefix()}/${key}`
   return [`${base}/visualization`, `${base}/connection`]
 }
 
 const state = ref('idle')  // 'idle' | 'connecting' | 'open' | 'closed' | 'error' | 'disabled'
 const lastError = ref(null)
 let client = null
-// robotId → manufacturer ('' = wildcard). Источник правды для подписок:
-// при реконнекте переподписываемся по этой карте.
+// manufacturer/serialNumber → id робота. Источник правды для подписок: при реконнекте переподписываемся по ней.
 const subscriptions = new Map()
 
 // visualization может идти с высокой частотой — копим последнее значение
@@ -60,43 +59,47 @@ function schedulePose(robotId, pose) {
 }
 
 function handleMessage(topic, payload) {
-  // uagv/v2/<manufacturer>/<serialNumber>/<subtopic>
+  // {interface}/{version}/{manufacturer}/{serialNumber}/{subtopic}
   const parts = topic.split('/')
   if (parts.length !== 5) return
-  const robotId = parts[3]
-  const sub = parts[4]
-  if (!subscriptions.has(robotId)) return
+  const robotId = subscriptions.get(`${parts[2]}/${parts[3]}`)
+  if (!robotId) return
 
   let msg
   try { msg = JSON.parse(payload.toString()) } catch { return }
 
-  if (sub === 'visualization') {
-    const p = msg?.agvPosition
+  if (parts[4] === 'visualization') {
+    const p = msg?.mobileRobotPosition
     if (!p) return
     schedulePose(robotId, {
       x: Number(p.x) || 0,
       y: Number(p.y) || 0,
       theta: Number(p.theta) || 0,
+      mapId: p.mapId,
     })
-  } else if (sub === 'connection') {
-    // ONLINE → статус не трогаем, его отдаёт control (WS/poll).
-    // OFFLINE / CONNECTIONBROKEN → сразу offline, не дожидаясь poll.
-    if (msg?.connectionState && msg.connectionState !== 'ONLINE') {
-      useRobotsStore().applyTelemetry(robotId, { status: 'offline' })
+  } else if (parts[4] === 'connection') {
+    // Не ONLINE → сразу offline, не дожидаясь опроса. Обратно в online — только по данным fms (опрос).
+    const connection = msg?.connectionState
+    if (connection && connection !== 'ONLINE') {
+      useRobotsStore().applyTelemetry(robotId, {
+        connection,
+        status: 'offline',
+        availability: { state: 'OFFLINE', reasons: [{ code: 'NO_CONNECTION', message: `connection: ${connection}` }] },
+      })
     }
   }
 }
 
-function doSubscribe(robotId, manufacturer) {
+function doSubscribe(key) {
   if (!client?.connected) return  // подпишемся в on('connect')
-  client.subscribe(topicsFor(robotId, manufacturer), { qos: 0 }, (err) => {
-    if (err) lastError.value = `subscribe ${robotId}: ${err.message}`
+  client.subscribe(topicsFor(key), { qos: 0 }, (err) => {
+    if (err) lastError.value = `subscribe ${key}: ${err.message}`
   })
 }
 
-function doUnsubscribe(robotId, manufacturer) {
+function doUnsubscribe(key) {
   if (!client?.connected) return
-  client.unsubscribe(topicsFor(robotId, manufacturer))
+  client.unsubscribe(topicsFor(key))
 }
 
 export function connect() {
@@ -118,7 +121,7 @@ export function connect() {
     state.value = 'open'
     lastError.value = null
     // clean session: после каждого (пере)подключения подписки надо восстановить
-    for (const [robotId, manufacturer] of subscriptions) doSubscribe(robotId, manufacturer)
+    for (const key of subscriptions.keys()) doSubscribe(key)
   })
   client.on('message', handleMessage)
   client.on('error', (e) => { state.value = 'error'; lastError.value = e.message })
@@ -132,35 +135,32 @@ export function disconnect() {
   if (client) { client.end(true); client = null }
 }
 
-// Подписаться на робота. Вызывать после успешного POST /fms/robots.
-export function subscribeRobot(robotId, manufacturer = '') {
-  if (!robotId) return
-  const m = (manufacturer || '').trim()
-  const prev = subscriptions.get(robotId)
-  if (prev === m) return
-  if (prev !== undefined) doUnsubscribe(robotId, prev)
-  subscriptions.set(robotId, m)
-  doSubscribe(robotId, m)
+// Подписаться на робота ({ id, manufacturer, serialNumber }) — после регистрации и по списку из опроса
+export function subscribeRobot(robot) {
+  if (!robot?.manufacturer || !robot?.serialNumber) return
+  const key = robotKey(robot)
+  if (subscriptions.get(key) === robot.id) return
+  subscriptions.set(key, robot.id)
+  doSubscribe(key)
 }
 
-// Отписаться от робота. Вызывать после успешного DELETE /fms/robots.
+// Отписаться от робота по id — после удаления
 export function unsubscribeRobot(robotId) {
-  if (!subscriptions.has(robotId)) return
-  doUnsubscribe(robotId, subscriptions.get(robotId))
-  subscriptions.delete(robotId)
+  for (const [key, id] of subscriptions) {
+    if (id !== robotId) continue
+    doUnsubscribe(key)
+    subscriptions.delete(key)
+  }
   pendingPose.delete(robotId)
 }
 
-// Досподписка по списку с бэка (после F5 карта подписок пустая).
-// Уже подписанных с явным manufacturer не трогаем: manufacturer из формы
-// регистрации точнее, чем hardware_version, которое робот ещё мог не прислать.
-// Отписку здесь не делаем: poll, стартовавший до POST, может вернуть список
-// без только что добавленного робота. Отписка только через unsubscribeRobot.
+// Подписки = список роботов из опроса: новых подписать, тех, кого в списке нет, отписать
 export function syncRobots(robots) {
-  for (const r of robots) {
-    const known = subscriptions.get(r.id)
-    if (known === undefined || (known === '' && r.manufacturer)) subscribeRobot(r.id, r.manufacturer || '')
+  const ids = new Set(robots.map((r) => r.id))
+  for (const id of new Set(subscriptions.values())) {
+    if (!ids.has(id)) unsubscribeRobot(id)
   }
+  for (const r of robots) subscribeRobot(r)
 }
 
 export function useRobotMqtt() {

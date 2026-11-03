@@ -58,7 +58,7 @@ npm run test:e2e   # Playwright
 
 Адрес бэка и режим:
 - `.env.local` в корне: `VITE_API_BASE_URL=http://192.168.0.105:5000/api` и `VITE_USE_MOCKS=false` (читается только при старте dev-сервера).
-- **Runtime-конфиг без пересборки:** `public/config.js` → после build лежит в `dist/config.js`. Поля `apiBaseUrl`, `useMocks`, `wsUrl`, `mqttUrl`, `mqttUser`, `mqttPassword`. В git лежит с пустыми адресами, локальные IP Семёна не коммитить. Пустая строка / `null` = брать из сборки. Подключается в `<head>` через `%BASE_URL%config.js` **до** bundle (иначе `window.__FLEET_CONFIG__` не успевает).
+- **Runtime-конфиг без пересборки:** `public/config.js` → после build лежит в `dist/config.js`. Поля `apiBaseUrl` (шлюз fms), `useMocks`, `mqttUrl`, `mqttUser`, `mqttPassword`, `mqttInterface`, `mqttVersion`. В git лежит с пустыми адресами, локальные IP Семёна не коммитить. Пустая строка / `null` = брать из сборки. Подключается в `<head>` через `%BASE_URL%config.js` **до** bundle (иначе `window.__FLEET_CONFIG__` не успевает).
 - Приоритет: `localStorage` (переключатель в Settings → API) → runtime `config.js` → env → дефолт (mock).
 - Vite `base` = `/fleet-manager/`, порт dev = 5175 (в `vite.config.js`), preview всегда 4173.
 
@@ -71,7 +71,7 @@ api/
   robots.js maps.js missions.js alerts.js auth.js index.js
   mocks/          пустые списки; mock robots хранит зарегистрированных в памяти
 stores/           robots.js (polling + applyTelemetry), maps.js (localStorage)
-composables/      useBackendHealth, useTelemetryWs, useRobotMqtt, useTheme
+composables/      useBackendHealth, useRobotMqtt, useTheme
 views/            Dashboard, LiveMap, MapsList, MapEditor, Robots, Missions, Alarms, Settings
 components/       AppSidebar, AppTopbar
 lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphConfig, robotSprite, theme
@@ -87,8 +87,8 @@ lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphC
 
 **Данные роботов — два канала** (решение Семёна 2026-09-08/11):
 - HTTP `GET /api/fms/robots` раз в **5 сек** (глобальный singleton polling в `stores/robots.js`) — снапшот для таблицы. Формат — `Robot` контракта v2 (`spec + status + availability`), мапится во внутреннего робота через `toViewRobot()`. GET отвечает база fms через шлюз.
-- WebSocket `useTelemetryWs` — только **позиция** `agvPosition {mapId, positionInitialized, x, y, theta}` для Live Map. URL: `config.js.wsUrl`, иначе выводится из `apiBaseUrl` (`http://host:5000/api` → `ws://host:5000`). Нативный WebSocket (не socket.io), авто-reconnect с backoff 1→2→5→10→30 с. В mock-режиме не подключается. ID робота: `msg.robot_id`, иначе `manufacturer-serialNumber`.
-- **MQTT напрямую от брокера** (`useRobotMqtt`, Mosquitto, MQTT over WS, пользователь `fleet-ui` только на чтение — `docs/MOSQUITTO_SETUP.md`). Топики `uagv/v2/<manufacturer>/<name>/visualization` (позиция, применяется раз в кадр) и `.../connection` (не `ONLINE` → offline). Подписка оформляется **после success на `POST /fms/robots`** (manufacturer из формы, пустой → `+`), отписка после удаления, после F5 — досподписка по `GET /fms/robots`. Пустой `mqttUrl` или mock → выключено.
+- WebSocket fms убран (контракт v2, решение 2026-10-14; `useTelemetryWs` и `wsUrl` удалены 2026-11-03).
+- **MQTT напрямую от брокера** (`useRobotMqtt`, MQTT over WS, пользователь `fleet-ui` только на чтение — `docs/MOSQUITTO_SETUP.md`, конфиг брокера — `deploy/mosquitto` в репо fms). Топики `amr/v3/<manufacturer>/<serialNumber>/visualization` (`mobileRobotPosition`, применяется раз в кадр) и `.../connection` (не `ONLINE` → сразу offline, обратно — только по опросу fms). Робот в топике — `manufacturer/serialNumber`, в сторе — `id`. Подписки следуют за списком из опроса (`syncRobots`: новых подписать, удалённых отписать) и оформляются сразу после регистрации. Пустой `mqttUrl` или mock → выключено.
 - Live Map показывает робота только если его `mapId` совпадает с именем/id активной карты (или mapId ещё не пришёл).
 - `positionInitialized === false` → жёлтый тег **not calibrated** в таблице и drawer (на карте не отмечаем).
 
@@ -127,7 +127,7 @@ lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphC
 
 Префикс всех путей — `/api/fms/*`. Полная спека: `docs/API_CONTRACT.md` (источник истины).
 
-Протокол роботов: `docs/VDA5050_EN.md` — **VDA 5050 v3.0.0** (топики `vda5050/v3/...`, `mobileRobotPosition`, `CONNECTION_BROKEN`). Код MQTT и `docs/MOSQUITTO_SETUP.md` пока написаны под v2 (`uagv/v2`, `agvPosition`) — перед запуском на роботах сверить, какую версию они реально шлют. Картинки из спеки (`./assets/*.png`) в репо не положены.
+Протокол роботов: `docs/VDA5050_EN.md` — **VDA 5050 v3.0.0** (топики `vda5050/v3/...`, `mobileRobotPosition`, `CONNECTION_BROKEN`). Код MQTT и `docs/MOSQUITTO_SETUP.md` — под v3 (`amr/v3`, `mobileRobotPosition`); начало топика настраивается (`mqttInterface` / `mqttVersion`). Картинки из спеки (`./assets/*.png`) в репо не положены.
 
 | Метод | Путь | Заметки |
 |---|---|---|
@@ -151,11 +151,11 @@ lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphC
 2. **Сервисный режим / mapping** (идея Семёна): отдельным экраном (Teleop из UI убран) показывать SLAM-карту, которая строится пока катаешь робота, потом сохранить на сервер и нанести маршруты. Решение Семёна: **в обход FMS**, фронт напрямую подключается к локальному WS-серверу на роботе (IP робота в настройках фронта), перед входом отменяются все задачи робота. Не решено: откуда фронт берёт IP:порт, формат SLAM-сообщений (черновик — `slam_map` с base64+gzip occupancy grid, `resolution/origin/width/height`), CORS на роботе, отдельная страница `/mapping/:id`. Пока не начато.
 3. **Формат Alerts** (`GET /api/fms/alerts`): предложен `{id, severity, source: robot|system, robot_id|null, title, detail, created_at, acknowledged}` + `POST /api/fms/alerts/:id/ack`. Через HTTP-запрос, не WS. Не утверждено; после утверждения делаем колокольчик со счётчиком непрочитанных в топбаре.
 4. **Миссии**: `POST/GET /api/fms/missions`, `POST .../:id/cancel` — фронт (мастер + таблица + cancel) готов, ждёт бэк.
-5. **Переход на контракт v2** (2026-11-03): U-1 API-слой роботов, U-2 стор (`byState`, опрос на паузе при скрытой вкладке), U-3 экран Robots на `availability` (причины в подсказке, Pause/Resume, удаление с `ROBOT_BUSY` → диалог «удалить и отменить миссию», карточка с ошибками робота) — сделаны; дальше U-4 MQTT `amr/v3` + `serialNumber` и без WebSocket, U-5 Dashboard / Live Map.
+5. **Переход на контракт v2** (2026-11-03): U-1 API-слой роботов, U-2 стор (`byState`, опрос на паузе при скрытой вкладке), U-3 экран Robots на `availability` (причины в подсказке, Pause/Resume, удаление с `ROBOT_BUSY` → диалог «удалить и отменить миссию», карточка с ошибками робота) , U-4 MQTT `amr/v3` по `serialNumber`, WebSocket убран — сделаны; дальше U-5 Dashboard / Live Map на `availability`.
 
 **Решено «нет» / отложено:** кнопка `initPosition` (обнуление позиции) — «пока не будем»; мобильная вёрстка — «пока нет»; e2e в CI — «не знаю» (не решено).
 
-**Идеи, если будет время:** колокольчик алертов, Playwright e2e в GitHub Actions (сценарии сейчас лежат только в scratchpad прошлой сессии), i18n-переключатель, `wsUrl`/`mqttUrl` в Settings, разбить чанки `mqtt` (~370 кБ) и `naive-ui` (~650 кБ).
+**Идеи, если будет время:** колокольчик алертов, Playwright e2e в GitHub Actions (сценарии сейчас лежат только в scratchpad прошлой сессии), i18n-переключатель, `mqttUrl` в Settings, разбить чанки `mqtt` (~370 кБ) и `naive-ui` (~650 кБ).
 
 ## 8. Ловушки окружения и кода
 
