@@ -45,7 +45,11 @@ const store = useMapsStore()
 const msg = useMessage()
 const { isDark } = useTheme()
 
-const map = computed(() => store.get(route.params.id))
+// Только полная карта (store.open): строка из списка карт без графа редактору не годится
+const map = computed(() => {
+  const m = store.get(route.params.id)
+  return m?.full ? m : null
+})
 
 const nodes = reactive({})
 const edges = reactive({})
@@ -100,6 +104,9 @@ const PASTE_OFFSET_PX = 20  // ~1м при resolution=0.05
 
 // Preview JSON модалка
 const showPreview = ref(false)
+// Конфликт версий при сохранении: карту сохранил кто-то другой
+const showConflict = ref(false)
+const conflictVersion = ref(null)
 const previewTab = ref('geojson')
 const showHelp = ref(false)  // ? cheatsheet
 const SHORTCUTS = [
@@ -752,34 +759,58 @@ function doExportZoneSet() {
   downloadJson(`${map.value.name.replace(/\s+/g, '_')}.zoneset.json`, zs)
   msg.success(`Exported ${zs.zones.length} zones`)
 }
-function doExportLifMulti() {
+async function doExportLifMulti() {
   if (!store.maps.length) return
+  // В списке карт нет графа — открываем все
+  try { await Promise.all(store.maps.map((m) => store.open(m.id))) } catch (e) { return msg.error('Maps not loaded: ' + e.message) }
   const l = exportLifMulti(store.maps)
   downloadJson(`fleet-manager-multi.lif.json`, l)
   msg.success(`Exported multi-layout LIF: ${l.layouts.length} layouts`)
 }
-// Идёт через API-слой: в mock-режиме локально сохраняет, в real шлёт PATCH /maps/:id
+// PATCH /fms/maps/:id с версией, которую загрузили (store.save); в mock-режиме — в localStorage
 async function saveToBackend() {
   try {
-    const patch = {
-      name: map.value.name,
-      meta: map.value.meta,
-      waypoints: map.value.waypoints,
-      edges: map.value.edges,
-      stations: map.value.stations,
-      zones: map.value.zones || [],
-      // Готовый zoneSet в метрах — диспетчеру не нужно пересчитывать пиксели
-      zoneSet: buildZoneSet(map.value),
-    }
-    await api.maps.updateMap(map.value.id, patch)
-    const mode = api.getMockMode() ? '(mock)' : ''
-    msg.success(`Saved ${mode}`.trim())
+    const saved = await store.save(map.value.id)
+    msg.success(`Saved v${saved.version}${api.getMockMode() ? ' (mock)' : ''}`)
   } catch (e) {
-    if (e instanceof api.ApiError) {
+    if (e instanceof api.ApiError && e.code === 'VERSION_CONFLICT') {
+      conflictVersion.value = e.details?.currentVersion ?? null
+      showConflict.value = true
+    } else if (e instanceof api.ApiError && e.code === 'INVALID_MAP') {
+      msg.error(`Not saved: ${(e.details?.errors || [e.message]).join('; ')}`, { duration: 10000 })
+    } else if (e instanceof api.ApiError) {
       msg.error(`Save failed: ${e.code} — ${e.message}`)
     } else {
       msg.error('Save failed: ' + (e.message || String(e)))
     }
+  }
+}
+
+// После конфликта: выбросить свои правки и взять карту из fms
+async function reloadFromServer() {
+  try {
+    await store.reload(map.value.id)
+  } catch (e) {
+    return msg.error('Reload failed: ' + (e.message || String(e)))
+  }
+  history.value = []
+  historyIdx.value = -1
+  syncFromStore()
+  pushHistory()
+  msg.info(`Map reloaded, v${map.value.version}`)
+}
+
+// Полная карта из fms; несохранённые правки — из черновика, если карту за это время не меняли
+async function openMap(id) {
+  try {
+    const draft = await store.open(id)
+    if (draft === 'restored') msg.info('Unsaved changes restored')
+    if (draft === 'discarded') msg.warning('The map was changed in fms — your unsaved draft was discarded', { duration: 8000 })
+    return true
+  } catch (e) {
+    msg.error('Map not loaded: ' + (e.message || String(e)))
+    router.replace({ name: 'maps' })
+    return false
   }
 }
 
@@ -1160,7 +1191,8 @@ function onKey(e) {
 }
 
 onMounted(async () => {
-  if (!map.value) { router.replace({ name: 'maps' }); return }
+  if (!(await openMap(route.params.id))) return
+  await nextTick()
   syncFromStore()
   pushHistory()
   window.addEventListener('keydown', onKey)
@@ -1523,7 +1555,11 @@ watch([selectedNodes, selectedEdges], ([n, e]) => {
 })
 // Смена инструмента или карты сбрасывает черновик
 watch(tool, () => { zoneDraft.value = null })
-watch(() => route.params.id, () => { zoneDraft.value = null; selectedZoneId.value = null })
+watch(() => route.params.id, async (id) => {
+  zoneDraft.value = null
+  selectedZoneId.value = null
+  if (id && (await openMap(id))) syncFromStore()
+})
 
 function newZoneId() {
   const existing = new Set((map.value?.zones || []).map((z) => z.id))
@@ -2012,6 +2048,8 @@ const zoneToolHint = computed(() => {
       <div class="flex-1" />
 
       <button class="rounded border border-slate-200 dark:border-slate-700 px-3 py-1 text-xs hover:bg-slate-50 dark:hover:bg-slate-800" @click="showPreview = true">Preview JSON</button>
+      <span class="whitespace-nowrap font-mono text-[10px] text-slate-500 dark:text-slate-400" title="Map version in fms">v{{ map.version }}</span>
+      <span v-if="map.dirty" class="whitespace-nowrap text-xs text-amber-600 dark:text-amber-400">Unsaved changes</span>
       <button class="rounded bg-brand-800 px-3 py-1 text-xs text-white hover:bg-brand-900" @click="saveToBackend">Save</button>
     </div>
 
@@ -2584,6 +2622,17 @@ const zoneToolHint = computed(() => {
         </div>
       </aside>
     </div>
+
+    <NModal
+      v-model:show="showConflict"
+      preset="dialog"
+      type="warning"
+      title="The map was changed in fms"
+      :content="`Someone saved this map${conflictVersion ? ` (version ${conflictVersion})` : ''} after you opened it. Reload it to continue — your unsaved changes will be lost. Cancel keeps them on screen, e.g. to export LIF first.`"
+      positive-text="Reload"
+      negative-text="Cancel"
+      @positive-click="reloadFromServer"
+    />
 
     <NModal
       v-model:show="showPreview"

@@ -70,7 +70,7 @@ api/
   schemas.js      Zod; RobotV2 (контракт v2, раздел 5.1) + toViewRobot() (Robot v2 → внутренний робот)
   robots.js maps.js missions.js alerts.js auth.js index.js
   mocks/          пустые списки; mock robots хранит зарегистрированных в памяти
-stores/           robots.js (polling + applyTelemetry), maps.js (localStorage)
+stores/           robots.js (polling + applyTelemetry), maps.js (карты в fms: load/open/save с версией, черновики)
 composables/      useBackendHealth, useRobotMqtt, useTheme
 views/            Dashboard, LiveMap, MapsList, MapEditor, Robots, Missions, Alarms, Settings
 components/       AppSidebar, AppTopbar
@@ -98,7 +98,13 @@ lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphC
 
 **Live Map.** SVG, не Konva. Координаты: `px = 60 + x*25`, отступ 60 px вокруг карты, `viewBox` = размер карты + 120, `preserveAspectRatio="xMidYMid meet"`, высота `calc(100vh - 11rem)`. Zoom 25–500% + pan мышью (drag), `1:1` сбрасывает и то и другое. Роботы `ROBOT_SIZE=32`, waypoints `r=2.5`.
 
-**Map Editor.** `v-network-graph`, инструменты Select/Node/Batch points/Batch lines/Edge/Station/Set Origin/Calibrate, метровые линейки, actions на нодах, импорт/экспорт LIF (в т.ч. multi-layout) и Nav2 GeoJSON. Карты хранятся в `localStorage` (PGM + YAML Nav2). Станции — скруглённые квадраты с белой иконкой (зарядка/парковка/погрузка/звезда), не круги.
+**Map Editor.** `v-network-graph`, инструменты Select/Node/Batch points/Batch lines/Edge/Station/Set Origin/Calibrate, метровые линейки, actions на нодах, импорт/экспорт LIF (в т.ч. multi-layout) и Nav2 GeoJSON. Карты хранятся в fms (контракт, раздел 6), store `stores/maps.js`:
+- `load()` — список без графа и картинки (`full: false`); `open(id)` — карта целиком (`full: true`), её ждут редактор, Live Map и Missions (их `map`/`activeMap` — только полная карта);
+- редактор меняет карту синхронно (`update`/`updateMeta`, ставят `dirty`), на сервер — по Save (`save` → `PATCH` с `version`); `409 VERSION_CONFLICT` → диалог «Reload» (`reload` выбрасывает свои правки), `400 INVALID_MAP` → текст ошибок сервера;
+- несохранённые правки — черновик в `localStorage` `fm.maps.drafts.v1` (без картинки): `open` восстанавливает его, если версия на сервере та же, иначе выбрасывает;
+- id карты = VDA `mapId` роботов, задаётся при создании (поле Map ID), пусто — генерирует сервер;
+- схемы карты — `passthrough`: поля документа, которых схема не знает, не теряются;
+- mock-режим — `api/mocks/maps.mock.js` в `localStorage` `fm.maps.v1` с теми же правилами (версия, 409). Станции — скруглённые квадраты с белой иконкой (зарядка/парковка/погрузка/звезда), не круги.
 
 **Зоны и атрибуты VDA 5050 v3 в редакторе** (2026-09-26):
 - Инструменты Zone (Z, полигон: клик по первой вершине / двойной клик в одной точке / Enter) и Rectangle zone (R). Все 10 типов зон v3, параметры по типу — `components/editor/ZonePanel.vue`. Вершины тянутся ручками, клик по середине стороны добавляет вершину, центр двигает всю зону.
@@ -131,7 +137,7 @@ lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphC
 
 | Метод | Путь | Заметки |
 |---|---|---|
-Бэк — fms (репо `fleet-manager`): шлюз nginx на порту **8080** разводит `GET /api/fms/*` в базу (fleet_database, :8002), остальное — в fleet_control (:8003). У UI один `apiBaseUrl` = `http://<машина>:8080/api` (`deploy/README.md` в репо fms).
+Бэк — fms (репо `fleet-manager`): шлюз nginx на порту **8080** разводит `GET /api/fms/*` в базу (fleet_database, :8002), остальное — в fleet_control (:8003). Шлюз же раздаёт собранный UI (`/fleet-manager/`) и проксирует MQTT over WebSocket (`/mqtt` → mosquitto `127.0.0.1:9001`), так что UI, API и MQTT — с одного origin. На деплое `config.js` = `deploy/ui/config.js` из репо fms (`apiBaseUrl: '/api'`, `mqttUrl` из `location.host`); в dev — полные адреса `http://<машина>:8080/api` и `ws://<машина>:8080/mqtt` (`deploy/README.md` в репо fms).
 
 | Метод | Путь | Заметки |
 |---|---|---|
@@ -151,7 +157,7 @@ lib/              exportLif*/importLif/exportGeoJson (LIF, Nav2 GeoJSON), graphC
 2. **Сервисный режим / mapping** (идея Семёна): отдельным экраном (Teleop из UI убран) показывать SLAM-карту, которая строится пока катаешь робота, потом сохранить на сервер и нанести маршруты. Решение Семёна: **в обход FMS**, фронт напрямую подключается к локальному WS-серверу на роботе (IP робота в настройках фронта), перед входом отменяются все задачи робота. Не решено: откуда фронт берёт IP:порт, формат SLAM-сообщений (черновик — `slam_map` с base64+gzip occupancy grid, `resolution/origin/width/height`), CORS на роботе, отдельная страница `/mapping/:id`. Пока не начато.
 3. **Формат Alerts** (`GET /api/fms/alerts`): предложен `{id, severity, source: robot|system, robot_id|null, title, detail, created_at, acknowledged}` + `POST /api/fms/alerts/:id/ack`. Через HTTP-запрос, не WS. Не утверждено; после утверждения делаем колокольчик со счётчиком непрочитанных в топбаре.
 4. **Миссии**: `POST/GET /api/fms/missions`, `POST .../:id/cancel` — фронт (мастер + таблица + cancel) готов, ждёт бэк.
-5. **Переход на контракт v2** (2026-11-03): U-1 API-слой роботов, U-2 стор (`byState`, опрос на паузе при скрытой вкладке), U-3 экран Robots на `availability` (причины в подсказке, Pause/Resume, удаление с `ROBOT_BUSY` → диалог «удалить и отменить миссию», карточка с ошибками робота), U-4 MQTT `amr/v3` по `serialNumber`, WebSocket убран, U-5 Dashboard и Live Map на `availability`, переходный `status` убран — сделаны. Дальше — проверка на настоящей fms через шлюз, потом карты, миссии и тревоги по мере готовности fms.
+5. **Переход на контракт v2** (2026-11-03): U-1 API-слой роботов, U-2 стор (`byState`, опрос на паузе при скрытой вкладке), U-3 экран Robots на `availability` (причины в подсказке, Pause/Resume, удаление с `ROBOT_BUSY` → диалог «удалить и отменить миссию», карточка с ошибками робота), U-4 MQTT `amr/v3` по `serialNumber`, WebSocket убран, U-5 Dashboard и Live Map на `availability`, переходный `status` убран, U-6 карты в fms (версия, конфликт, черновики, Map ID) — сделаны и проверены на настоящей fms через шлюз. Дальше — робот на граф (`position`) и Live Map в координатах карты, потом миссии и тревоги по мере готовности fms.
 
 **Решено «нет» / отложено:** кнопка `initPosition` (обнуление позиции) — «пока не будем»; мобильная вёрстка — «пока нет»; e2e в CI — «не знаю» (не решено).
 

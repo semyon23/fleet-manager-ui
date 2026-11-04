@@ -1,15 +1,20 @@
+import { ApiError } from '../client'
+
 /**
- * Мок-сторэдж для Maps API. Использует существующий localStorage-persist
- * из stores/maps.js, чтобы UI видел одни и те же данные из обоих слоёв.
+ * Мок карт: «сервер» в localStorage (ключ fm.maps.v1) с правилами fms (контракт, раздел 6):
+ * версия растёт при каждом сохранении, PATCH по чужой версии — 409 VERSION_CONFLICT,
+ * список — без графа и картинки. Граф mock не проверяет. Карты, сохранённые раньше без версии, — версия 1.
  */
 
 const LS_KEY = 'fm.maps.v1'
+// Поля записи: их ставит сервер, в документ карты из запроса они не попадают
+const RECORD_FIELDS = ['id', 'name', 'version', 'pgmDataUrl', 'createdAt', 'updatedAt', 'zoneSet']
+const LISTS = ['waypoints', 'edges', 'stations', 'zones', 'assignedRobots']
 
 function readAll() {
   try {
     const raw = localStorage.getItem(LS_KEY)
-    if (!raw) return []
-    return JSON.parse(raw)
+    return raw ? JSON.parse(raw).map((m) => ({ version: 1, ...m })) : []
   } catch { return [] }
 }
 function writeAll(list) {
@@ -18,56 +23,70 @@ function writeAll(list) {
 function nowIso() { return new Date().toISOString() }
 function newId() { return 'map-' + Math.random().toString(36).slice(2, 8) }
 
-export function listMaps() {
-  return readAll()
-}
-export function getMap(id) {
-  const map = readAll().find((m) => m.id === id)
-  if (!map) {
-    const err = new Error('Map not found')
-    err.status = 404
-    throw err
-  }
+function find(list, id) {
+  const map = list.find((m) => m.id === id)
+  if (!map) throw new ApiError(404, 'NOT_FOUND', `map ${id} not found`)
   return map
 }
+
+function documentFields(body) {
+  return Object.fromEntries(Object.entries(body).filter(([key]) => !RECORD_FIELDS.includes(key)))
+}
+
+export function listMaps() {
+  return readAll().map(({ waypoints, edges, zones, pgmDataUrl, ...summary }) => summary)
+}
+
+export function getMap(id) {
+  return find(readAll(), id)
+}
+
 export function createMap(payload) {
   const list = readAll()
+  const id = payload.id || newId()
+  if (list.some((m) => m.id === id)) throw new ApiError(409, 'ALREADY_EXISTS', `map ${id} already exists`)
+  const now = nowIso()
   const map = {
-    id: newId(),
+    ...documentFields(payload),
+    id,
     name: payload.name,
-    meta: payload.meta,
-    pgmDataUrl: payload.pgmDataUrl || '',
-    width: payload.width,
-    height: payload.height,
-    waypoints: payload.waypoints || [],
-    edges: payload.edges || [],
-    stations: payload.stations || [],
-    zones: payload.zones || [],
-    assignedRobots: payload.assignedRobots || [],
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
+    version: 1,
+    pgmDataUrl: payload.pgmDataUrl ?? null,
+    createdAt: now,
+    updatedAt: now,
   }
+  for (const key of LISTS) map[key] = map[key] || []
   list.push(map)
   writeAll(list)
   return map
 }
+
 export function updateMap(id, patch) {
-  const list = readAll()
-  const idx = list.findIndex((m) => m.id === id)
-  if (idx < 0) {
-    const err = new Error('Map not found')
-    err.status = 404
-    throw err
+  if (!Number.isInteger(patch.version)) {
+    throw new ApiError(400, 'INVALID_INPUT', 'some fields are invalid', { version: 'required: the version of the map you loaded' })
   }
-  const updated = { ...list[idx], ...patch, updatedAt: nowIso() }
-  list[idx] = updated
+  const list = readAll()
+  const current = find(list, id)
+  if (patch.version !== current.version) {
+    throw new ApiError(409, 'VERSION_CONFLICT', 'the map was saved by someone else, reload it',
+      { currentVersion: current.version })
+  }
+  const updated = {
+    ...current,
+    ...documentFields(patch),
+    name: patch.name ?? current.name,
+    version: current.version + 1,
+    updatedAt: nowIso(),
+  }
+  if ('pgmDataUrl' in patch) updated.pgmDataUrl = patch.pgmDataUrl
+  list[list.indexOf(current)] = updated
   writeAll(list)
   return updated
 }
+
 export function deleteMap(id) {
-  writeAll(readAll().filter((m) => m.id !== id))
+  const list = readAll()
+  find(list, id)
+  writeAll(list.filter((m) => m.id !== id))
   return null
-}
-export function assignRobots(id, robotIds) {
-  return updateMap(id, { assignedRobots: robotIds })
 }

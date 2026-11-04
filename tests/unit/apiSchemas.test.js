@@ -13,7 +13,7 @@ describe('API schemas — happy path', () => {
 
   it('MapEntity accepts minimum fields', () => {
     const ok = S.MapEntity.safeParse({
-      id: 'm1', name: 'M', width: 100, height: 100,
+      id: 'm1', name: 'M', version: 1, width: 100, height: 100,
       meta: { resolution: 0.05, origin: [0, 0, 0] },
     })
     expect(ok.success).toBe(true)
@@ -119,7 +119,7 @@ describe('Robot v2 (контракт, раздел 5.1) → внутренний
 
 describe('MapEntity — поля VDA 5050 v3 и зоны', () => {
   const base = {
-    id: 'm1', name: 'F1', width: 100, height: 100,
+    id: 'm1', name: 'F1', version: 3, width: 100, height: 100,
     meta: { resolution: 0.05, origin: [0, 0, 0] },
   }
 
@@ -135,6 +135,27 @@ describe('MapEntity — поля VDA 5050 v3 и зоны', () => {
     expect(m.waypoints[0].actions[0].actionParameters[0].value).toEqual(['LOCAL'])
     expect(m.edges[0].corridor.releaseLossBehavior).toBe('RETURN')
     expect(m.zones[0].maximumSpeed).toBe(0.3)
+  })
+
+  it('не теряет поля, которых схема не знает: документ карты хранится как есть', () => {
+    const m = S.MapEntity.parse({
+      ...base,
+      description: 'floor 1',
+      waypoints: [{ id: 'n1', u: 1, v: 2, stopAllowed: false }],
+      edges: [{ id: 'e', from: 'n1', to: 'n1', note: 'x' }],
+    })
+    expect(m.description).toBe('floor 1')
+    expect(m.waypoints[0].stopAllowed).toBe(false)
+    expect(m.edges[0].note).toBe('x')
+  })
+
+  it('список карт — без графа и картинки, версия обязательна', () => {
+    const summary = S.MapSummary.parse(base)
+    expect(summary.waypoints).toBeUndefined()   // у полной карты здесь был бы [] по умолчанию
+    expect(S.MapEntity.parse(base).waypoints).toEqual([])
+    expect(summary.version).toBe(3)
+    const { version, ...noVersion } = base
+    expect(S.MapSummary.safeParse(noVersion).success).toBe(false)
   })
 
   it('отклоняет зону с неизвестным типом или < 3 вершин', () => {

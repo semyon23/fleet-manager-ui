@@ -39,14 +39,18 @@ export const RefreshResponse = LoginResponse.pick({
 })
 
 // === Maps ===
+// Карту хранит fms (контракт, раздел 6) как документ редактора: всё, что в нём есть, сервер возвращает
+// как прислали. Поэтому схемы карты пропускают неизвестные поля (passthrough) — иначе поле, которого
+// схема не знает (например, stopAllowed), пропало бы при чтении и при следующем сохранении.
+// Граф проверяет сервер; здесь — только то, на что опирается код фронта.
 export const MapMeta = z.object({
   resolution: z.number().positive(),
-  origin: z.tuple([z.number(), z.number(), z.number()]),
+  origin: z.array(z.number()).min(2).max(3),
   occupiedThresh: z.number().min(0).max(1).optional(),
   freeThresh: z.number().min(0).max(1).optional(),
   negate: z.union([z.literal(0), z.literal(1)]).optional(),
   mode: z.enum(['trinary', 'scale', 'raw']).optional(),
-})
+}).passthrough()
 // Action узла/ребра (VDA 5050 v3, 7.3). Значение параметра — любой JSON.
 export const MapAction = z.object({
   actionId: z.string(),
@@ -66,7 +70,7 @@ export const Waypoint = z.object({
   id: z.string(),
   u: z.number(),
   v: z.number(),
-  name: z.string(),
+  name: z.string().optional().default(''),
   description: z.string().optional().default(''),
   mapId: z.string().optional().default(''),
   actions: z.array(MapAction).optional().default([]),
@@ -74,7 +78,7 @@ export const Waypoint = z.object({
   theta: z.number().optional(),
   allowedDeviationXY: z.object({ a: z.number(), b: z.number(), theta: z.number() }).optional(),
   allowedDeviationTheta: z.number().optional(),
-})
+}).passthrough()
 export const Corridor = z.object({
   leftWidth: z.number().nonnegative(),
   rightWidth: z.number().nonnegative(),
@@ -86,8 +90,8 @@ export const Edge = z.object({
   id: z.string(),
   from: z.string(),
   to: z.string(),
-  cost: z.number().nonnegative().default(0),
-  maxSpeed: z.number().positive().default(1),
+  cost: z.number().default(0),                    // < 0 — только предупреждение, сервер считает 0
+  maxSpeed: z.number().nonnegative().default(1),
   maximumMobileRobotHeight: z.number().nonnegative().optional(),
   minimumLoadHandlingDeviceHeight: z.number().nonnegative().optional(),
   orientation: z.number().optional(),
@@ -97,7 +101,7 @@ export const Edge = z.object({
   maximumRotationSpeed: z.number().nonnegative().optional(),
   corridor: Corridor.optional(),
   actions: z.array(MapAction).optional().default([]),
-})
+}).passthrough()
 // Зона карты (VDA 5050 v3, 6.4). Вершины в пикселях карты, углы — мировые радианы.
 // Поля типа (maximumSpeed, direction, ...) — см. lib/vda5050.js ZONE_TYPES.
 export const Zone = z.object({
@@ -118,23 +122,24 @@ export const Zone = z.object({
   direction: z.number().optional(),
   directedLimitation: z.enum(['SOFT', 'RESTRICTED', 'STRICT']).optional(),
   bidirectedLimitation: z.enum(['SOFT', 'RESTRICTED']).optional(),
-})
+}).passthrough()
 export const Station = z.object({
   id: z.string(),
   u: z.number(),
   v: z.number(),
-  name: z.string(),
+  name: z.string().optional().default(''),
   kind: z.enum(['charge', 'loading', 'parking', 'custom']),
   description: z.string().optional().default(''),
   interactionNodeIds: z.array(z.string()).default([]),
-})
+}).passthrough()
 export const MapEntity = z.object({
-  id: z.string(),
+  id: z.string(),                       // = VDA mapId роботов
   name: z.string(),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
+  version: z.number().int().positive(), // растёт при каждом сохранении; PATCH обязан прислать ту, что загрузил
+  width: z.number().positive(),
+  height: z.number().positive(),
   meta: MapMeta,
-  pgmDataUrl: z.string().optional(),
+  pgmDataUrl: z.string().nullable().optional(),
   waypoints: z.array(Waypoint).default([]),
   edges: z.array(Edge).default([]),
   stations: z.array(Station).default([]),
@@ -142,8 +147,10 @@ export const MapEntity = z.object({
   assignedRobots: z.array(z.string()).default([]),
   createdAt: IsoDateTime.optional(),
   updatedAt: IsoDateTime.optional(),
-})
-export const MapList = z.array(MapEntity)
+}).passthrough()
+// GET /fms/maps — без графа и картинки: полную карту UI берёт GET /fms/maps/:id
+export const MapSummary = MapEntity.omit({ pgmDataUrl: true, waypoints: true, edges: true, zones: true }).passthrough()
+export const MapSummaryList = z.array(MapSummary)
 
 // === Robots (контракт v2, раздел 5) ===
 // Робот целиком: spec (пишет control) + status (dispatch) + availability (control).

@@ -2,7 +2,7 @@
 import { useRobotsStore } from '../stores/robots'
 import { useMapsStore } from '../stores/maps'
 import { NCard, NTag, NSelect, NSwitch } from 'naive-ui'
-import { ref, computed, watchEffect } from 'vue'
+import { ref, computed, watch, watchEffect } from 'vue'
 import { spriteFor, previewSpriteFor, tintStyle, tintFilterId, TINT_HUES } from '../lib/robotSprite'
 import { availabilityOf } from '../lib/availability'
 import { stationKindMeta } from '../lib/theme'
@@ -16,7 +16,14 @@ watchEffect(() => {
   if (!selectedMapId.value && maps.maps.length) selectedMapId.value = maps.maps[0].id
 })
 
-const activeMap = computed(() => (selectedMapId.value ? maps.get(selectedMapId.value) : null))
+// Граф и картинка — только у открытой карты (store.open); пока грузится — пустое поле
+const activeMap = computed(() => {
+  const m = selectedMapId.value ? maps.get(selectedMapId.value) : null
+  return m?.full ? m : null
+})
+watch(selectedMapId, (id) => {
+  if (id) maps.open(id).catch((e) => console.warn('[live-map] map not loaded:', e.message))
+}, { immediate: true })
 const mapOptions = computed(() =>
   maps.maps.length ? maps.maps.map((m) => ({ label: m.name, value: m.id })) : [],
 )
@@ -34,7 +41,7 @@ const ROBOT_SIZE = 32
 
 const filteredRobots = computed(() => {
   if (!activeMap.value) return robots.robots
-  if (!activeMap.value.assignedRobots.length) return robots.robots
+  if (!activeMap.value.assignedRobots?.length) return robots.robots
   return robots.robots.filter((r) => activeMap.value.assignedRobots.includes(r.id))
 })
 

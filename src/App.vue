@@ -5,6 +5,7 @@ import { useMediaQuery } from '@vueuse/core'
 import AppSidebar from './components/AppSidebar.vue'
 import AppTopbar from './components/AppTopbar.vue'
 import { useRobotsStore } from './stores/robots'
+import { useMapsStore } from './stores/maps'
 import { useTheme } from './composables/useTheme'
 import { useBackendHealth } from './composables/useBackendHealth'
 import { useRobotMqtt } from './composables/useRobotMqtt'
@@ -23,6 +24,8 @@ watch(wide, (w) => (collapsed.value = !w))
 onMounted(() => {
   // Глобальный опрос GET /fms/robots раз в 5 с: всё, что считает fms (статус, готовность, миссия).
   robots.startPolling()
+  // Список карт — один раз: меняются редко, экран Maps перечитывает его сам
+  useMapsStore().load().catch((e) => console.warn('[maps] list not loaded:', e.message))
   // Health-ping /api/health каждые 3 сек — sidebar footer показывает индикатор.
   health.startPing()
   // MQTT over WS: живая поза и связь роботов напрямую от брокера. Подписки следуют за списком

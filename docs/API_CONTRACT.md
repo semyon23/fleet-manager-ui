@@ -588,7 +588,7 @@ POST /fms/missions
 
 | Настройка `config.js` | Пример | |
 |---|---|---|
-| `mqttUrl` | `wss://host:9001` | MQTT over WebSocket |
+| `mqttUrl` | `ws://host:8080/mqtt` | MQTT over WebSocket через шлюз fms |
 | `mqttUser` / `mqttPassword` | `fleet-ui` / ... | пользователь с правом только на чтение |
 | `mqttInterface` | `amr` | НОВОЕ: первая часть топика |
 | `mqttVersion` | `v3` | НОВОЕ: версия в топике |

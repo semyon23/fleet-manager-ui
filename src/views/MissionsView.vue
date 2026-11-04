@@ -55,8 +55,9 @@ const form = ref({
   steps: [],  // [{ nodeId }] — упорядоченная последовательность точек
 })
 
-function openBuilder() {
-  const firstMap = maps.maps[0]
+async function openBuilder() {
+  if (maps.maps[0]) await maps.open(maps.maps[0].id).catch(() => {})   // в списке карт нет узлов
+  const firstMap = maps.get(maps.maps[0]?.id)
   form.value = {
     name: '',
     mapId: firstMap?.id || null,
@@ -84,8 +85,9 @@ const waypointOptions = computed(() => {
 })
 
 // При смене карты — сбрасываем steps (id из старой карты не валидны)
-watch(() => form.value.mapId, (mapId, prev) => {
+watch(() => form.value.mapId, async (mapId, prev) => {
   if (mapId === prev) return
+  if (mapId) await maps.open(mapId).catch(() => {})
   const m = mapId ? maps.get(mapId) : null
   form.value.steps = m?.waypoints?.length ? [{ nodeId: m.waypoints[0].id }] : []
 })
