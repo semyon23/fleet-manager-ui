@@ -196,7 +196,7 @@ GET /health → 200
 {
   "state": "NOT_READY",   // OFFLINE | NOT_READY | IDLE | BUSY | CHARGING | PAUSED | ERROR | DELETING
   "reasons": [
-    { "code": "NOT_ON_GRAPH", "message": "Robot is 2.4 m away from the nearest node" }
+    { "code": "NOT_ON_GRAPH", "message": "robot is not on a node of map map_1, set its position first" }
   ]
 }
 ```
@@ -217,8 +217,9 @@ GET /health → 200
 - `STARTUP`;
 - `MODE_NOT_AUTOMATIC`;
 - `NOT_LOCALIZED`;
-- `UNKNOWN_MAP`;
-- `NOT_ON_GRAPH`;
+- `UNKNOWN_MAP` — карты робота (`status.pose.mapId`) нет в fms: создать карту с этим id (раздел 6);
+- `NOT_ON_GRAPH` — `status.lastNodeId` не узел карты робота (после включения робот узла не знает):
+  поставить робота на узел — `POST /fms/robots/:id/position` (раздел 5.2);
 - `MISSING_ACTIONS`;
 - `LOW_BATTERY`;
 - `EMERGENCY_STOP`;
@@ -259,6 +260,7 @@ GET /health → 200
 | DELETE | `/fms/robots/:id` | control | → 202 `Robot` (`lifecycle: PENDING_DELETE`) |
 | POST | `/fms/robots/:id/pause` | control | → 202 |
 | POST | `/fms/robots/:id/resume` | control | → 202 |
+| POST | `/fms/robots/:id/position` | control | `{mapId, nodeId, theta?}` → 202 |
 | POST | `/fms/robots/:id/park` | control | → 202 `Mission` (служебная миссия на парковку) |
 
 **Регистрация:**
@@ -285,6 +287,25 @@ POST /fms/robots
 
 **Пауза.** `pause` / `resume` действуют на робота (VDA `startPause` / `stopPause`), а не на миссию.
 Ответ 202 значит «команда отправлена». Факт — `status.paused` в статусе робота (виден при следующем опросе).
+
+**Робот на узле.** Оператор говорит fms, на каком узле стоит робот. fms берёт координаты узла из графа карты
+и шлёт роботу VDA `initializePosition`:
+
+```json
+POST /fms/robots/amr-01/position
+{ "mapId": "map_1", "nodeId": "n1", "theta": 1.57 }
+```
+
+- `mapId`, `nodeId` обязательны. Узел — waypoint или станция карты.
+- `theta` (рад) необязательна: нет — `theta` узла, у узла нет — прежняя ориентация робота.
+- Ответ 202 значит «команда отправлена». Факт — `status.lastNodeId`, `status.pose` и `availability`
+  при следующем опросе.
+- Ошибки:
+  - 400 `INVALID_INPUT` с `details.mapId` / `details.nodeId` / `details.theta` (в том числе узла нет на карте);
+  - 404 `NOT_FOUND` — нет карты или робота;
+  - 409 `ROBOT_BUSY` — у робота миссия (по VDA робот с заказом позицию не меняет);
+  - 409 `INVALID_STATE` — робот не на связи;
+  - 503 `UNAVAILABLE` — fms ещё загружает карты.
 
 ---
 

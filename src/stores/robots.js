@@ -133,6 +133,6 @@ export const useRobotsStore = defineStore('robots', () => {
     robots, byState, totalBattery,
     addRobot, mergeRobots, removeRobot, applyTelemetry,
     pollingActive, lastPollAt, lastPollError,
-    startPolling, stopPolling,
+    startPolling, stopPolling, pollOnce,
   }
 })

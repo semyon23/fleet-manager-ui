@@ -9,9 +9,11 @@ import { previewSpriteFor, tintStyle } from '../lib/robotSprite'
 import { AVAILABILITY_OPTIONS, availabilityOf } from '../lib/availability'
 import * as api from '../api'
 import { subscribeRobot, unsubscribeRobot } from '../composables/useRobotMqtt'
+import PlaceRobotDialog from '../components/PlaceRobotDialog.vue'
 
 const store = useRobotsStore()
 const msg = useMessage()
+const showPlace = ref(false)
 
 function toggleLive(val) {
   if (val) store.startPolling()
@@ -396,6 +398,15 @@ async function submitRegister() {
             >
               {{ selectedRobot.paused ? 'Resume' : 'Pause' }}
             </NButton>
+            <!-- С миссией нельзя: по VDA робот с заказом initializePosition не примет -->
+            <NButton
+              size="small"
+              :disabled="selectedRobot.connection !== 'ONLINE' || !!selectedRobot.mission"
+              :title="selectedRobot.mission ? 'The robot is executing a mission' : 'Tell fms which node the robot is on'"
+              @click="showPlace = true"
+            >
+              Place on node
+            </NButton>
             <div class="flex-1"></div>
             <NPopconfirm
               :on-positive-click="() => deleteRobot(selectedRobot.id)"
@@ -412,6 +423,8 @@ async function submitRegister() {
         <div v-else class="text-sm text-slate-500">No robot selected.</div>
       </NDrawerContent>
     </NDrawer>
+
+    <PlaceRobotDialog v-model:show="showPlace" :robot="selectedRobot" />
 
     <!-- Робот занят: удалить с отменой миссии? -->
     <NModal

@@ -10,6 +10,7 @@ import * as mocks from './mocks/robots.mock'
  * - PATCH  /fms/robots/:id              { name?, labels? } → Robot
  * - DELETE /fms/robots/:id[?force=true] → 202 Robot (lifecycle PENDING_DELETE); 409 ROBOT_BUSY без force
  * - POST   /fms/robots/:id/pause|resume → 202
+ * - POST   /fms/robots/:id/position     { mapId, nodeId, theta? } → 202; поставить робота на узел карты
  *
  * Наружу отдаём внутреннего робота (toViewRobot), а не ответ как есть.
  */
@@ -59,4 +60,14 @@ export async function pauseRobot(id) {
 export async function resumeRobot(id) {
   if (getMockMode()) return withMockDelay(mocks.setPaused(id, false))
   return request('POST', `${path(id)}/resume`)
+}
+
+// Робот стоит на узле nodeId карты mapId: fms шлёт ему VDA initializePosition с координатами узла.
+// theta (рад) необязательна: нет — ориентация узла, у узла нет — прежняя. 202 — команда отправлена;
+// результат — status.lastNodeId и availability при следующем опросе.
+export async function setPosition(id, { mapId, nodeId, theta }) {
+  const body = { mapId, nodeId }
+  if (theta !== undefined && theta !== null) body.theta = theta
+  if (getMockMode()) return withMockDelay(mocks.setPosition(id, body))
+  return request('POST', `${path(id)}/position`, { body })
 }

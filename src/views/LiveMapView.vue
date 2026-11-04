@@ -1,20 +1,32 @@
 <script setup>
 import { useRobotsStore } from '../stores/robots'
 import { useMapsStore } from '../stores/maps'
-import { NCard, NTag, NSelect, NSwitch } from 'naive-ui'
+import { NCard, NTag, NSelect, NSwitch, NButton } from 'naive-ui'
 import { ref, computed, watch, watchEffect } from 'vue'
 import { spriteFor, previewSpriteFor, tintStyle, tintFilterId, TINT_HUES } from '../lib/robotSprite'
 import { availabilityOf } from '../lib/availability'
 import { stationKindMeta } from '../lib/theme'
 import { zoneTypeMeta } from '../lib/vda5050'
+import { worldToPixel } from '../lib/nav2meta'
+import { worldAngleToSvgDeg } from '../lib/geometry'
+import PlaceRobotDialog from '../components/PlaceRobotDialog.vue'
 
 const robots = useRobotsStore()
 const maps = useMapsStore()
 
-const selectedMapId = ref(maps.maps[0]?.id || null)
+// Карт может быть несколько сразу: робот на той, что в его pose.mapId. Пока оператор карту не выбрал сам —
+// показываем ту, на которой есть роботы (роботы приходят опросом позже карт), иначе первую.
+const selectedMapId = ref(null)
+const mapPicked = ref(false)
 watchEffect(() => {
-  if (!selectedMapId.value && maps.maps.length) selectedMapId.value = maps.maps[0].id
+  if (mapPicked.value && maps.get(selectedMapId.value)) return
+  const withRobots = maps.maps.find((m) => robots.robots.some((r) => r.mapId === m.id))
+  selectedMapId.value = (withRobots || maps.maps[0])?.id || null
 })
+function pickMap(id) {
+  selectedMapId.value = id
+  mapPicked.value = true
+}
 
 // Граф и картинка — только у открытой карты (store.open); пока грузится — пустое поле
 const activeMap = computed(() => {
@@ -33,17 +45,14 @@ const selectedId = ref(null)
 const selected = computed(() => markers.value.find((m) => m.id === selectedId.value) || null)
 const hovered = ref(null)
 
-const SCALE = 25
-const OFFSET_X = 60
-const OFFSET_Y = 60
 // Roboты уменьшены (Семён 2026-09-06): 56 → 32. Масштабируются вместе с картой (zoom).
 const ROBOT_SIZE = 32
 
-const filteredRobots = computed(() => {
-  if (!activeMap.value) return robots.robots
-  if (!activeMap.value.assignedRobots?.length) return robots.robots
-  return robots.robots.filter((r) => activeMap.value.assignedRobots.includes(r.id))
-})
+const filteredRobots = computed(() =>
+  activeMap.value ? robots.robots.filter((r) => r.mapId === activeMap.value.id) : [],
+)
+const elsewhereCount = computed(() => robots.robots.filter((r) => r.mapId !== selectedMapId.value).length)
+const showPlace = ref(false)
 
 const showRoutes = ref(true)
 const showZones = ref(true)
@@ -79,18 +88,13 @@ function zoomReset() { zoom.value = 1; panX.value = 0; panY.value = 0 }
 
 const PADDING = 60
 
-const viewBox = computed(() => {
-  if (activeMap.value) {
-    const w = activeMap.value.width + PADDING * 2
-    const h = activeMap.value.height + PADDING * 2
-    return `0 0 ${w} ${h}`
-  }
-  return '0 0 700 600'
-})
+const viewSize = computed(() =>
+  activeMap.value ? { w: activeMap.value.width + PADDING * 2, h: activeMap.value.height + PADDING * 2 } : { w: 700, h: 600 },
+)
+const viewBox = computed(() => `0 0 ${viewSize.value.w} ${viewSize.value.h}`)
 
 const zoomTransform = computed(() => {
-  const w = activeMap.value ? activeMap.value.width + PADDING * 2 : 700
-  const h = activeMap.value ? activeMap.value.height + PADDING * 2 : 600
+  const { w, h } = viewSize.value
   return `translate(${panX.value} ${panY.value}) translate(${w / 2} ${h / 2}) scale(${zoom.value}) translate(${-w / 2} ${-h / 2})`
 })
 
@@ -184,20 +188,26 @@ const roads = computed(() => {
   })
 })
 
+// Поза робота — метры карты; на экране — пиксели картинки карты (как узлы), ось Y вниз
 const markers = computed(() =>
-  filteredRobots.value.map((r) => ({
-    ...r,
-    px: OFFSET_X + r.x * SCALE,
-    py: OFFSET_Y + r.y * SCALE,
-    stroke: availabilityOf(r).color,
-    stateLabel: availabilityOf(r).label,
-    offline: r.availability?.state === 'OFFLINE',
-    thetaDeg: (-r.theta * 180) / Math.PI,
-    activeSprite: spriteFor(r),
-    isTopView: !r.driving,
-    tintFilter: `url(#${tintFilterId(r)})`,
-  })),
+  filteredRobots.value.map((r) => {
+    const { u, v } = worldToPixel(activeMap.value.meta, r.x, r.y, activeMap.value.height)
+    return {
+      ...r,
+      px: PADDING + u,
+      py: PADDING + v,
+      stroke: availabilityOf(r).color,
+      stateLabel: availabilityOf(r).label,
+      offline: r.availability?.state === 'OFFLINE',
+      rotateDeg: worldAngleToSvgDeg(r.theta),
+      activeSprite: spriteFor(r),
+      isTopView: !r.driving,
+      tintFilter: `url(#${tintFilterId(r)})`,
+    }
+  }),
 )
+// Подсказка у робота — не вылезать за правый край карты
+const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 : 0, viewSize.value.w - 170))
 </script>
 
 <template>
@@ -208,14 +218,18 @@ const markers = computed(() =>
           <span class="text-base font-semibold">Live Map</span>
           <NSelect
             v-if="mapOptions.length"
-            v-model:value="selectedMapId"
+            :value="selectedMapId"
             :options="mapOptions"
             size="small"
             style="width: 240px"
+            @update:value="pickMap"
           />
           <router-link v-else to="/maps" class="text-xs text-brand-700 dark:text-brand-300 hover:underline">
             No maps uploaded yet -> upload one
           </router-link>
+          <span v-if="mapOptions.length && elsewhereCount" class="text-xs text-slate-500 dark:text-slate-400">
+            {{ elsewhereCount }} {{ elsewhereCount === 1 ? 'robot' : 'robots' }} on other maps or without a map
+          </span>
         </div>
       </template>
       <template #header-extra>
@@ -275,20 +289,16 @@ const markers = computed(() =>
             <!-- На светлой теме карту делаем контрастнее (opacity 0.85 vs 0.55) -->
             <image
               :href="activeMap.pgmDataUrl"
-              :x="60" :y="60"
+              :x="PADDING" :y="PADDING"
               :width="activeMap.width"
               :height="activeMap.height"
               preserveAspectRatio="none"
               class="opacity-80 dark:opacity-60"
             />
           </template>
-          <template v-else>
-            <rect x="60" y="60" width="580" height="480" fill="#f8fafc" stroke="#1e40af" stroke-width="2" />
-            <rect x="80" y="80" width="120" height="80" fill="#dbeafe" stroke="#1e40af" stroke-dasharray="4 4" />
-            <text x="90" y="110" font-size="11" fill="#1e40af" font-family="monospace">CHARGE ZONE</text>
-            <rect x="450" y="400" width="150" height="100" fill="#fef3c7" stroke="#eab308" stroke-dasharray="4 4" />
-            <text x="460" y="425" font-size="11" fill="#92400e" font-family="monospace">LOADING</text>
-          </template>
+          <text v-else x="350" y="300" text-anchor="middle" font-size="14" class="fill-slate-400">
+            {{ mapOptions.length ? 'Loading the map…' : 'No maps in fms' }}
+          </text>
 
           <g v-if="zones.length">
             <g v-for="z in zones" :key="z.id">
@@ -378,7 +388,7 @@ const markers = computed(() =>
             />
 
             <g v-if="m.isTopView && !m.offline"
-               :transform="`translate(${m.px} ${m.py}) rotate(${-m.thetaDeg})`">
+               :transform="`translate(${m.px} ${m.py}) rotate(${m.rotateDeg})`">
               <polygon
                 :points="`${ROBOT_SIZE / 2 + 3},0 ${ROBOT_SIZE / 2 + 9},-3 ${ROBOT_SIZE / 2 + 9},3`"
                 :fill="m.stroke"
@@ -408,7 +418,7 @@ const markers = computed(() =>
 
           <g v-if="hovered" pointer-events="none">
             <rect
-              :x="Math.min(hovered.px + 24, 510)"
+              :x="tooltipX"
               :y="Math.max(hovered.py - 36, 8)"
               width="160"
               height="72"
@@ -419,7 +429,7 @@ const markers = computed(() =>
               filter="drop-shadow(0 2px 4px rgba(0,0,0,0.15))"
             />
             <text
-              :x="Math.min(hovered.px + 30, 516)"
+              :x="tooltipX + 6"
               :y="Math.max(hovered.py - 22, 24)"
               font-size="9"
               font-family="JetBrains Mono, monospace"
@@ -429,7 +439,7 @@ const markers = computed(() =>
               {{ hovered.id }} · {{ hovered.model }}
             </text>
             <text
-              :x="Math.min(hovered.px + 30, 516)"
+              :x="tooltipX + 6"
               :y="Math.max(hovered.py - 10, 38)"
               font-size="8"
               font-family="JetBrains Mono, monospace"
@@ -438,7 +448,7 @@ const markers = computed(() =>
               ● {{ hovered.stateLabel }}
             </text>
             <text
-              :x="Math.min(hovered.px + 30, 516)"
+              :x="tooltipX + 6"
               :y="Math.max(hovered.py + 2, 50)"
               font-size="8"
               font-family="JetBrains Mono, monospace"
@@ -447,7 +457,7 @@ const markers = computed(() =>
               battery {{ hovered.battery }}%
             </text>
             <text
-              :x="Math.min(hovered.px + 30, 516)"
+              :x="tooltipX + 6"
               :y="Math.max(hovered.py + 14, 62)"
               font-size="8"
               font-family="JetBrains Mono, monospace"
@@ -519,8 +529,18 @@ const markers = computed(() =>
         <div class="flex justify-between"><span class="text-slate-500">Position</span><span class="font-mono text-xs">{{ selected.x.toFixed(2) }}, {{ selected.y.toFixed(2) }} m</span></div>
         <div class="flex justify-between"><span class="text-slate-500">Heading</span><span class="font-mono text-xs">{{ ((selected.theta * 180) / Math.PI).toFixed(1) }}°</span></div>
         <div class="flex justify-between"><span class="text-slate-500">Map</span><span class="font-mono text-xs">{{ selected.mapId || '-' }}</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">Last node</span><span class="font-mono text-xs">{{ selected.lastNodeId || '-' }}</span></div>
         <div class="flex justify-between"><span class="text-slate-500">Mission</span><span class="font-mono text-xs">{{ selected.mission || '-' }}</span></div>
+        <NButton
+          size="small"
+          :disabled="selected.connection !== 'ONLINE' || !!selected.mission"
+          :title="selected.mission ? 'The robot is executing a mission' : 'Tell fms which node the robot is on'"
+          @click="showPlace = true"
+        >
+          Place on node
+        </NButton>
       </div>
     </NCard>
+    <PlaceRobotDialog v-model:show="showPlace" :robot="selected" />
   </div>
 </template>
