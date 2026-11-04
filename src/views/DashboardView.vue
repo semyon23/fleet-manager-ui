@@ -5,6 +5,7 @@ import { NCard, NDataTable, NEmpty, NButton } from 'naive-ui'
 import { RouterLink } from 'vue-router'
 import { previewSpriteFor, tintStyle } from '../lib/robotSprite'
 import { useTheme } from '../composables/useTheme'
+import { AVAILABILITY, availabilityOf } from '../lib/availability'
 
 import {
   Chart as ChartJS,
@@ -22,32 +23,25 @@ ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Le
 const store = useRobotsStore()
 const { isDark } = useTheme()
 
-const STATUS_COLORS = {
-  moving: '#22c55e',
-  charging: '#eab308',
-  idle: '#94a3b8',
-  error: '#ef4444',
-  offline: '#64748b',
-  deploying: '#f97316',
-}
-
 const kpis = computed(() => [
-  { label: 'Total', value: store.counts.total },
-  { label: 'Moving', value: store.counts.moving },
-  { label: 'Charging', value: store.counts.charging },
-  { label: 'Idle', value: store.counts.idle },
-  { label: 'Errors', value: store.counts.error },
+  { label: 'Total', value: store.byState.total },
+  { label: 'Busy', value: store.byState.BUSY || 0 },
+  { label: 'Idle', value: store.byState.IDLE || 0 },
+  { label: 'Charging', value: store.byState.CHARGING || 0 },
+  { label: 'Errors', value: store.byState.ERROR || 0 },
   { label: 'Avg battery', value: `${store.totalBattery}%` },
 ])
 
-// === Doughnut: распределение статусов ===
+// === Doughnut: сколько роботов в каком состоянии готовности ===
+// UNKNOWN — availability ещё не посчитана (робот только что зарегистрирован)
+const STATES = [...Object.entries(AVAILABILITY), ['UNKNOWN', availabilityOf(null)]]
 const statusData = computed(() => {
   const labels = []
   const data = []
   const colors = []
-  for (const [status, color] of Object.entries(STATUS_COLORS)) {
-    const n = store.counts[status] || 0
-    if (n > 0) { labels.push(status); data.push(n); colors.push(color) }
+  for (const [state, { label, color }] of STATES) {
+    const n = store.byState[state] || 0
+    if (n > 0) { labels.push(label); data.push(n); colors.push(color) }
   }
   return {
     labels,
@@ -106,7 +100,7 @@ const batteryOptions = computed(() => ({
   },
 }))
 
-// === Пустая лента событий пока WebSocket-стрим не подключён ===
+// === Лента событий: пока пустая, события (тревоги, миссии) fms ещё не отдаёт ===
 const events = []
 const columns = [
   { title: 'Time', key: 'time', render: (r) => h('span', { class: 'font-mono text-xs text-slate-500' }, r.time) },
@@ -130,8 +124,8 @@ onMounted(() => {})
 
     <!-- ================ Charts row ================ -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <NCard title="Status distribution" size="small" class="!bg-white dark:!bg-slate-900">
-        <div v-if="store.counts.total === 0" class="grid place-items-center py-8">
+      <NCard title="Availability" size="small" class="!bg-white dark:!bg-slate-900">
+        <div v-if="store.byState.total === 0" class="grid place-items-center py-8">
           <NEmpty description="No robots registered yet" size="small">
             <template #extra>
               <RouterLink to="/robots">
@@ -146,7 +140,7 @@ onMounted(() => {})
       </NCard>
 
       <NCard title="Battery levels" size="small" class="!bg-white dark:!bg-slate-900">
-        <div v-if="store.counts.total === 0" class="grid place-items-center py-8">
+        <div v-if="store.byState.total === 0" class="grid place-items-center py-8">
           <NEmpty description="Register robots to see their battery levels" size="small" />
         </div>
         <div v-else class="relative h-56">
@@ -159,7 +153,7 @@ onMounted(() => {})
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <NCard title="Recent events" size="small" class="lg:col-span-2 !bg-white dark:!bg-slate-900">
         <div v-if="!events.length" class="grid place-items-center py-6">
-          <NEmpty description="Event stream will appear once the backend WebSocket is connected" size="small" />
+          <NEmpty description="Fleet events will appear here" size="small" />
         </div>
         <NDataTable v-else :columns="columns" :data="events" :bordered="false" size="small" />
       </NCard>
@@ -178,10 +172,13 @@ onMounted(() => {})
               :src="previewSpriteFor(r)"
               :alt="r.id"
               class="h-8 w-8 object-contain"
-              :style="tintStyle(r.status)"
+              :style="tintStyle(r)"
             />
             <span class="flex-1 font-mono text-xs text-brand-800 dark:text-brand-300">{{ r.id }}</span>
-            <span class="w-16 text-xs text-slate-500 dark:text-slate-400">{{ r.status }}</span>
+            <span class="flex w-20 items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+              <span class="h-2 w-2 rounded-full" :style="{ background: availabilityOf(r).color }" />
+              {{ availabilityOf(r).label }}
+            </span>
             <span class="w-10 text-right font-mono text-xs text-slate-700 dark:text-slate-300">{{ r.battery }}%</span>
           </div>
         </div>

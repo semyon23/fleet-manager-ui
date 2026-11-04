@@ -91,7 +91,7 @@ describe('Robot v2 (контракт, раздел 5.1) → внутренний
     expect(r.name).toBe('AMR 01')
     expect(r.serialNumber).toBe('amr1')
     expect(r.availability.state).toBe('BUSY')
-    expect(r.status).toBe('moving')
+    expect(r.driving).toBe(false)
     expect(r.battery).toBe(78)
     expect(r.x).toBe(12.4)
     expect(r.mapId).toBe('map_1')
@@ -100,9 +100,10 @@ describe('Robot v2 (контракт, раздел 5.1) → внутренний
     expect(r.positionInitialized).toBe(true)
   })
 
-  it('robot without status and availability is offline', () => {
+  it('robot without status and availability has empty defaults', () => {
     const r = S.toViewRobot({ ...robot, status: null, availability: null })
-    expect(r.status).toBe('offline')
+    expect(r.availability).toBe(null)
+    expect(r.driving).toBe(false)
     expect(r.battery).toBe(0)
     expect(r.mission).toBe(null)
     expect(r.connection).toBe('UNKNOWN')

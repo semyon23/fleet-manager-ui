@@ -211,18 +211,7 @@ export const RegisterRobotRequest = z.object({
 })
 
 // Внутренний робот, который ест UI (таблица, карта, дашборд). Строится из RobotV2.
-// status — фронтовое состояние для цвета и фильтров; пока оно выводится из availability
-// (переходная таблица, заменим на availability целиком на шаге U-3).
-const STATE_TO_STATUS = {
-  OFFLINE: 'offline',
-  NOT_READY: 'idle',
-  IDLE: 'idle',
-  BUSY: 'moving',
-  CHARGING: 'charging',
-  PAUSED: 'idle',
-  ERROR: 'error',
-  DELETING: 'offline',
-}
+// Состояние для цвета и фильтров — availability.state (lib/availability.js).
 export function toViewRobot(r) {
   const s = r.status
   return {
@@ -234,7 +223,6 @@ export function toViewRobot(r) {
     lifecycle: r.lifecycle,
     model: `${r.manufacturer} · ${r.serialNumber}`,
     availability: r.availability,          // { state, reasons } или null
-    status: STATE_TO_STATUS[r.availability?.state] || 'offline',
     connection: s?.connection || 'UNKNOWN',
     battery: Math.round(s?.power.stateOfCharge ?? 0),
     charging: s?.power.charging ?? false,
@@ -243,13 +231,13 @@ export function toViewRobot(r) {
     theta: s?.pose?.theta ?? 0,
     mapId: s?.pose?.mapId ?? null,
     positionInitialized: s?.localized ?? false,
+    driving: s?.driving ?? false,
     lastNodeId: s?.lastNodeId || '',
     paused: s?.paused ?? false,
     operatingMode: s?.operatingMode ?? null,
     lastStateAt: s?.lastStateAt ?? null,
     errors: s?.errors ?? [],
     mission: s?.missionId ?? null,
-    uptime: '—',
   }
 }
 

@@ -120,7 +120,7 @@ const columns = [
         src: previewSpriteFor(r),
         alt: r.id,
         class: 'h-10 w-10 object-contain',
-        style: tintStyle(r.status),
+        style: tintStyle(r),
       }),
   },
   {
@@ -322,7 +322,7 @@ async function submitRegister() {
               :src="previewSpriteFor(selectedRobot)"
               :alt="selectedRobot.id"
               class="h-32 w-32 object-contain"
-              :style="tintStyle(selectedRobot.status)"
+              :style="tintStyle(selectedRobot)"
             />
           </div>
 

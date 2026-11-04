@@ -21,18 +21,7 @@ export const useRobotsStore = defineStore('robots', () => {
   // видеть только реальных зарегистрированных роботов.
   const robots = ref([])
 
-  const counts = computed(() => ({
-    moving: robots.value.filter((r) => r.status === 'moving').length,
-    charging: robots.value.filter((r) => r.status === 'charging').length,
-    idle: robots.value.filter((r) => r.status === 'idle').length,
-    error: robots.value.filter((r) => r.status === 'error').length,
-    offline: robots.value.filter((r) => r.status === 'offline').length,
-    deploying: robots.value.filter((r) => r.status === 'deploying').length,
-    total: robots.value.length,
-  }))
-
   // Сколько роботов в каждом состоянии готовности (availability.state, контракт v2).
-  // counts выше — по старому фронтовому status, им пока пользуются Dashboard и Live Map (переедут в U-5).
   const byState = computed(() => {
     const result = { total: robots.value.length }
     for (const r of robots.value) {
@@ -127,7 +116,6 @@ export const useRobotsStore = defineStore('robots', () => {
       mapId: patch.mapId ?? cur.mapId,
       connection: patch.connection ?? cur.connection,
       availability: patch.availability ?? cur.availability,
-      status: patch.status ?? cur.status,
     }
   }
 
@@ -142,7 +130,7 @@ export const useRobotsStore = defineStore('robots', () => {
   }
 
   return {
-    robots, counts, byState, totalBattery,
+    robots, byState, totalBattery,
     addRobot, mergeRobots, removeRobot, applyTelemetry,
     pollingActive, lastPollAt, lastPollError,
     startPolling, stopPolling,

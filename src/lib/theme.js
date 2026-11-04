@@ -27,13 +27,6 @@ export const COLORS = {
     700: '#334155',
     900: '#0f172a',
   },
-  status: {
-    moving:   '#22c55e',
-    charging: '#eab308',
-    idle:     '#64748b',
-    error:    '#ef4444',
-    offline:  '#94a3b8',
-  },
   accent: {
     orange: '#f97316',
     red:    '#dc2626',

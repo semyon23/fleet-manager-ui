@@ -26,7 +26,7 @@ const mqttModule = await import('../../src/composables/useRobotMqtt')
 const { useRobotsStore } = await import('../../src/stores/robots')
 
 const robot = { id: 'amr-01', manufacturer: 'ktc', serialNumber: 'amr1', x: 0, y: 0, theta: 0, mapId: null,
-  connection: 'ONLINE', status: 'idle', availability: { state: 'IDLE', reasons: [] } }
+  connection: 'ONLINE', availability: { state: 'IDLE', reasons: [] } }
 
 function publish(topic, message) {
   fake.client.emit('message', topic, Buffer.from(JSON.stringify(message)))

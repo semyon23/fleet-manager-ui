@@ -83,7 +83,6 @@ function handleMessage(topic, payload) {
     if (connection && connection !== 'ONLINE') {
       useRobotsStore().applyTelemetry(robotId, {
         connection,
-        status: 'offline',
         availability: { state: 'OFFLINE', reasons: [{ code: 'NO_CONNECTION', message: `connection: ${connection}` }] },
       })
     }

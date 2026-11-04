@@ -3,7 +3,8 @@ import { useRobotsStore } from '../stores/robots'
 import { useMapsStore } from '../stores/maps'
 import { NCard, NTag, NSelect, NSwitch } from 'naive-ui'
 import { ref, computed, watchEffect } from 'vue'
-import { spriteFor, previewSpriteFor, tintStyle } from '../lib/robotSprite'
+import { spriteFor, previewSpriteFor, tintStyle, tintFilterId, TINT_HUES } from '../lib/robotSprite'
+import { availabilityOf } from '../lib/availability'
 import { stationKindMeta } from '../lib/theme'
 import { zoneTypeMeta } from '../lib/vda5050'
 
@@ -20,16 +21,9 @@ const mapOptions = computed(() =>
   maps.maps.length ? maps.maps.map((m) => ({ label: m.name, value: m.id })) : [],
 )
 
-const statusColor = {
-  moving: '#22c55e',
-  charging: '#eab308',
-  idle: '#64748b',
-  error: '#ef4444',
-  offline: '#94a3b8',
-  deploying: '#f97316',
-}
-
-const selected = ref(null)
+// Выбранного храним по id: карточка справа берёт свежие данные из markers (поза из MQTT, опрос)
+const selectedId = ref(null)
+const selected = computed(() => markers.value.find((m) => m.id === selectedId.value) || null)
 const hovered = ref(null)
 
 const SCALE = 25
@@ -188,11 +182,13 @@ const markers = computed(() =>
     ...r,
     px: OFFSET_X + r.x * SCALE,
     py: OFFSET_Y + r.y * SCALE,
-    stroke: statusColor[r.status],
+    stroke: availabilityOf(r).color,
+    stateLabel: availabilityOf(r).label,
+    offline: r.availability?.state === 'OFFLINE',
     thetaDeg: (-r.theta * 180) / Math.PI,
     activeSprite: spriteFor(r),
-    isTopView: r.status !== 'moving',
-    tintFilter: `url(#tint-${r.status})`,
+    isTopView: !r.driving,
+    tintFilter: `url(#${tintFilterId(r)})`,
   })),
 )
 </script>
@@ -252,11 +248,11 @@ const markers = computed(() =>
               <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.25" />
             </filter>
 
-            <filter id="tint-moving"><feColorMatrix type="hueRotate" values="-120" /></filter>
-            <filter id="tint-charging"><feColorMatrix type="hueRotate" values="-160" /></filter>
-            <filter id="tint-error"><feColorMatrix type="hueRotate" values="140" /></filter>
-            <filter id="tint-idle"><feColorMatrix type="saturate" values="0.15" /></filter>
-            <filter id="tint-offline">
+            <!-- Тон спрайта по availability.state — та же таблица, что tintStyle для <img> -->
+            <filter v-for="(hue, state) in TINT_HUES" :id="'tint-' + state" :key="state">
+              <feColorMatrix type="hueRotate" :values="hue" />
+            </filter>
+            <filter id="tint-gray">
               <feColorMatrix type="matrix"
                 values="0.33 0.33 0.33 0 0
                         0.33 0.33 0.33 0 0
@@ -343,7 +339,7 @@ const markers = computed(() =>
             v-for="m in markers"
             :key="m.id"
             style="cursor: pointer"
-            @click.stop="selected = m"
+            @click.stop="selectedId = m.id"
             @mouseenter="hovered = m"
             @mouseleave="hovered = null"
           >
@@ -374,7 +370,7 @@ const markers = computed(() =>
               :filter="m.tintFilter"
             />
 
-            <g v-if="m.isTopView && m.status !== 'offline'"
+            <g v-if="m.isTopView && !m.offline"
                :transform="`translate(${m.px} ${m.py}) rotate(${-m.thetaDeg})`">
               <polygon
                 :points="`${ROBOT_SIZE / 2 + 3},0 ${ROBOT_SIZE / 2 + 9},-3 ${ROBOT_SIZE / 2 + 9},3`"
@@ -432,7 +428,7 @@ const markers = computed(() =>
               font-family="JetBrains Mono, monospace"
               :fill="hovered.stroke"
             >
-              ● {{ hovered.status }}
+              ● {{ hovered.stateLabel }}
             </text>
             <text
               :x="Math.min(hovered.px + 30, 516)"
@@ -501,24 +497,22 @@ const markers = computed(() =>
             :src="previewSpriteFor(selected)"
             :alt="selected.id"
             class="h-32 w-32 object-contain"
-            :style="tintStyle(selected.status)"
+            :style="tintStyle(selected)"
           />
         </div>
         <div class="flex justify-between"><span class="text-slate-500">Model</span><span class="font-mono">{{ selected.model }}</span></div>
         <div class="flex justify-between">
-          <span class="text-slate-500">Status</span>
-          <NTag :color="{ color: selected.stroke, textColor: 'white' }" size="small">{{ selected.status }}</NTag>
+          <span class="text-slate-500">State</span>
+          <NTag :color="{ color: selected.stroke, textColor: 'white' }" size="small">{{ selected.stateLabel }}</NTag>
         </div>
-        <div class="flex justify-between"><span class="text-slate-500">Battery</span><span class="font-mono">{{ selected.battery }}%</span></div>
+        <ul v-if="selected.availability?.reasons?.length" class="list-disc pl-5 text-xs text-slate-500 dark:text-slate-400">
+          <li v-for="reason in selected.availability.reasons" :key="reason.code">{{ reason.message }}</li>
+        </ul>
+        <div class="flex justify-between"><span class="text-slate-500">Battery</span><span class="font-mono">{{ selected.battery }}%{{ selected.charging ? ' ⚡' : '' }}</span></div>
         <div class="flex justify-between"><span class="text-slate-500">Position</span><span class="font-mono text-xs">{{ selected.x.toFixed(2) }}, {{ selected.y.toFixed(2) }} m</span></div>
         <div class="flex justify-between"><span class="text-slate-500">Heading</span><span class="font-mono text-xs">{{ ((selected.theta * 180) / Math.PI).toFixed(1) }}°</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">Map</span><span class="font-mono text-xs">{{ selected.mapId || '-' }}</span></div>
         <div class="flex justify-between"><span class="text-slate-500">Mission</span><span class="font-mono text-xs">{{ selected.mission || '-' }}</span></div>
-        <div class="flex justify-between"><span class="text-slate-500">Uptime</span><span class="font-mono text-xs">{{ selected.uptime }}</span></div>
-        <div class="mt-3 flex gap-2">
-          <button class="flex-1 rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">Pause</button>
-          <button class="flex-1 rounded bg-red-100 px-3 py-2 text-xs text-red-800 hover:bg-red-200 dark:bg-red-950 dark:text-red-200 dark:hover:bg-red-900">Stop</button>
-          <button class="flex-1 rounded bg-brand-100 px-3 py-2 text-xs text-brand-800 hover:bg-brand-200 dark:bg-brand-950 dark:text-brand-200 dark:hover:bg-brand-900">Home</button>
-        </div>
       </div>
     </NCard>
   </div>

@@ -18,13 +18,13 @@ export function pickDir(theta) {
 
 /**
  * URL картинки для робота под данный heading.
- * Для стационарных ситуаций (charging/idle/error/offline) — используем top view если доступен.
+ * Робот не едет (status.driving = false) — top view, если он есть.
  */
 export function spriteFor(robot) {
   if (!robot) return null
   if (!robot.sprites) return robot.sprite || null
   const s = robot.sprites
-  if (robot.status !== 'moving' && s.top) return s.top
+  if (!robot.driving && s.top) return s.top
   const dir = pickDir(robot.theta || 0)
   return s[dir] || s.top || null
 }
@@ -39,24 +39,21 @@ export function previewSpriteFor(robot) {
 }
 
 /**
- * CSS-filter для тонирования png-спрайта в цвет статуса (для <img> вне SVG).
- * Синие подсветки → цвет статуса.
+ * Тон спрайта по availability.state. Спрайт синий — это BUSY; остальные состояния — поворот
+ * оттенка к их цвету из lib/availability.js. Состояния без поворота (OFFLINE, DELETING,
+ * ещё не посчитано) — серые. Live Map строит из той же таблицы SVG-фильтры tint-<state>.
  */
-export function tintStyle(status) {
-  switch (status) {
-    case 'moving':
-      return 'filter: hue-rotate(-120deg)'
-    case 'charging':
-      return 'filter: hue-rotate(-160deg)'
-    case 'error':
-      return 'filter: hue-rotate(140deg)'
-    case 'idle':
-      return 'filter: saturate(0.15)'
-    case 'offline':
-      return 'filter: grayscale(1) opacity(0.5)'
-    case 'deploying':
-      return 'filter: hue-rotate(30deg) saturate(1.1)'
-    default:
-      return ''
-  }
+export const TINT_HUES = { IDLE: -100, BUSY: 0, CHARGING: -160, PAUSED: 45, NOT_READY: 165, ERROR: 140 }
+
+// CSS-filter для <img> вне SVG
+export function tintStyle(robot) {
+  const hue = TINT_HUES[robot?.availability?.state]
+  if (hue === undefined) return 'filter: grayscale(1) opacity(0.5)'
+  return hue ? `filter: hue-rotate(${hue}deg)` : ''
+}
+
+// id SVG-фильтра для <image> на карте
+export function tintFilterId(robot) {
+  const state = robot?.availability?.state
+  return state in TINT_HUES ? `tint-${state}` : 'tint-gray'
 }
