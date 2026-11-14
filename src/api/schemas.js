@@ -268,6 +268,20 @@ export const CreateMissionRequest = z.object({
   priority: z.enum(['low', 'normal', 'high', 'critical']).optional().default('normal'),
 })
 
+// === Маршруты роботов (контракт 7.4) ===
+const RoutePart = z.object({ nodes: z.array(z.string()), edges: z.array(z.string()) })
+export const RobotRoute = z.object({
+  robotId: z.string(),
+  mapId: z.string(),
+  missionId: z.string(),
+  stepIndex: z.number().int(),
+  released: RoutePart,
+  planned: RoutePart,
+  goals: z.array(z.string()),
+  nextMissionId: z.string().nullable(),
+})
+export const RobotRouteList = z.object({ items: z.array(RobotRoute) })
+
 // === Alerts ===
 export const Alert = z.object({
   id: z.string(),

@@ -5,7 +5,7 @@ import {
   NCard, NDataTable, NTag, NButton, NModal, NInput, NSelect, NSwitch, NPopconfirm,
   NDrawer, NDrawerContent, NEmpty, NTooltip, useMessage,
 } from 'naive-ui'
-import { previewSpriteFor, tintStyle } from '../lib/robotSprite'
+import RobotIcon from '../components/RobotIcon.vue'
 import { AVAILABILITY_OPTIONS, availabilityOf } from '../lib/availability'
 import * as api from '../api'
 import { subscribeRobot, unsubscribeRobot } from '../composables/useRobotMqtt'
@@ -115,15 +115,9 @@ function batteryBar(r) {
 const columns = [
   {
     title: '',
-    key: 'sprite',
+    key: 'look',
     width: 64,
-    render: (r) =>
-      h('img', {
-        src: previewSpriteFor(r),
-        alt: r.id,
-        class: 'h-10 w-10 object-contain',
-        style: tintStyle(r),
-      }),
+    render: (r) => h(RobotIcon, { robot: r, size: 40 }),
   },
   {
     title: 'ID', key: 'id', sorter: 'default',
@@ -320,12 +314,7 @@ async function submitRegister() {
       <NDrawerContent :title="selectedRobot?.id || 'Robot details'" closable>
         <div v-if="selectedRobot" class="flex flex-col gap-4">
           <div class="grid place-items-center rounded bg-slate-100 dark:bg-slate-800 py-4">
-            <img
-              :src="previewSpriteFor(selectedRobot)"
-              :alt="selectedRobot.id"
-              class="h-32 w-32 object-contain"
-              :style="tintStyle(selectedRobot)"
-            />
+            <RobotIcon :robot="selectedRobot" :size="112" />
           </div>
 
           <div>

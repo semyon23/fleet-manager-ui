@@ -3,7 +3,7 @@ import { computed, h, onMounted } from 'vue'
 import { useRobotsStore } from '../stores/robots'
 import { NCard, NDataTable, NEmpty, NButton } from 'naive-ui'
 import { RouterLink } from 'vue-router'
-import { previewSpriteFor, tintStyle } from '../lib/robotSprite'
+import RobotIcon from '../components/RobotIcon.vue'
 import { useTheme } from '../composables/useTheme'
 import { AVAILABILITY, availabilityOf } from '../lib/availability'
 
@@ -168,12 +168,7 @@ onMounted(() => {})
             :key="r.id"
             class="flex items-center gap-3 rounded border border-slate-100 dark:border-slate-800 px-2 py-1.5"
           >
-            <img
-              :src="previewSpriteFor(r)"
-              :alt="r.id"
-              class="h-8 w-8 object-contain"
-              :style="tintStyle(r)"
-            />
+            <RobotIcon :robot="r" :size="32" />
             <span class="flex-1 font-mono text-xs text-brand-800 dark:text-brand-300">{{ r.id }}</span>
             <span class="flex w-20 items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
               <span class="h-2 w-2 rounded-full" :style="{ background: availabilityOf(r).color }" />

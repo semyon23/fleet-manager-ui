@@ -2,14 +2,17 @@
 import { useRobotsStore } from '../stores/robots'
 import { useMapsStore } from '../stores/maps'
 import { NCard, NTag, NSelect, NSwitch, NButton } from 'naive-ui'
-import { ref, computed, watch, watchEffect } from 'vue'
-import { spriteFor, previewSpriteFor, tintStyle, tintFilterId, TINT_HUES } from '../lib/robotSprite'
-import { availabilityOf } from '../lib/availability'
+import { ref, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
+import { robotLook, footprintPx } from '../lib/robotLook'
+import { releasedPoints, plannedPoints, goalPoints, toPolyline } from '../lib/robotRoutes'
+import * as api from '../api'
 import { stationKindMeta } from '../lib/theme'
 import { zoneTypeMeta } from '../lib/vda5050'
 import { worldToPixel } from '../lib/nav2meta'
 import { worldAngleToSvgDeg } from '../lib/geometry'
 import PlaceRobotDialog from '../components/PlaceRobotDialog.vue'
+import RobotShape from '../components/RobotShape.vue'
+import RobotIcon from '../components/RobotIcon.vue'
 
 const robots = useRobotsStore()
 const maps = useMapsStore()
@@ -45,8 +48,8 @@ const selectedId = ref(null)
 const selected = computed(() => markers.value.find((m) => m.id === selectedId.value) || null)
 const hovered = ref(null)
 
-// Roboты уменьшены (Семён 2026-09-06): 56 → 32. Масштабируются вместе с картой (zoom).
-const ROBOT_SIZE = 32
+// Робот — в реальном масштабе карты (метры / разрешение), растёт вместе с zoom
+const robotSize = computed(() => footprintPx(activeMap.value?.meta?.resolution))
 
 const filteredRobots = computed(() =>
   activeMap.value ? robots.robots.filter((r) => r.mapId === activeMap.value.id) : [],
@@ -56,6 +59,24 @@ const showPlace = ref(false)
 
 const showRoutes = ref(true)
 const showZones = ref(true)
+const showRobotRoutes = ref(true)
+
+// === Маршруты роботов (контракт 7.4): опрос, пока страница открыта и вкладка видна (9.1) ===
+const ROUTES_POLL_MS = 1500
+const robotRoutes = ref([])
+let routesTimer = null
+async function pollRoutes() {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+  try {
+    robotRoutes.value = selectedMapId.value ? await api.routes.listRoutes(selectedMapId.value) : []
+  } catch (e) {
+    console.warn('[live-map] routes not loaded:', e.message)   // карта и роботы работают и без маршрутов
+  }
+}
+onMounted(() => { pollRoutes(); routesTimer = setInterval(pollRoutes, ROUTES_POLL_MS) })
+onBeforeUnmount(() => { if (routesTimer) clearInterval(routesTimer) })
+watch(selectedMapId, () => { robotRoutes.value = []; pollRoutes() })
+const routeByRobot = computed(() => new Map(robotRoutes.value.map((r) => [r.robotId, r])))
 
 // Зоны карты из редактора: полупрозрачные полигоны под маршрутами, только для просмотра
 const zones = computed(() => {
@@ -192,20 +213,43 @@ const roads = computed(() => {
 const markers = computed(() =>
   filteredRobots.value.map((r) => {
     const { u, v } = worldToPixel(activeMap.value.meta, r.x, r.y, activeMap.value.height)
+    const look = robotLook(r)
     return {
       ...r,
       px: PADDING + u,
       py: PADDING + v,
-      stroke: availabilityOf(r).color,
-      stateLabel: availabilityOf(r).label,
-      offline: r.availability?.state === 'OFFLINE',
+      look,
+      stroke: look.color,
+      stateLabel: look.label,
       rotateDeg: worldAngleToSvgDeg(r.theta),
-      activeSprite: spriteFor(r),
-      isTopView: !r.driving,
-      tintFilter: `url(#${tintFilterId(r)})`,
+      route: routeByRobot.value.get(r.id) || null,
     }
   }),
 )
+
+// Узел карты → точка на картинке (как у дорог); узла нет — null
+const nodePositions = computed(() => {
+  const m = activeMap.value
+  if (!m) return new Map()
+  return new Map([...(m.waypoints || []), ...(m.stations || [])].map((n) => [n.id, { x: PADDING + n.u, y: PADDING + n.v }]))
+})
+const position = (id) => nodePositions.value.get(id) || null
+
+// Линии маршрутов: выбранный робот — толстая линия поверх остальных, остальные — тонкие
+const routeLines = computed(() => {
+  if (!showRobotRoutes.value) return []
+  return markers.value
+    .filter((m) => m.route)
+    .map((m) => ({
+      id: m.id,
+      color: m.stroke,
+      selected: m.id === selectedId.value,
+      released: toPolyline(releasedPoints(m.route, position, { x: m.px, y: m.py })),
+      planned: toPolyline(plannedPoints(m.route, position)),
+      goals: goalPoints(m.route, position),
+    }))
+    .sort((a, b) => Number(a.selected) - Number(b.selected))
+})
 // Подсказка у робота — не вылезать за правый край карты
 const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 : 0, viewSize.value.w - 170))
 </script>
@@ -237,9 +281,13 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
           Show zones
           <NSwitch v-model:value="showZones" size="small" />
         </label>
-        <label class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          Show routes
+        <label class="mr-4 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          Show roads
           <NSwitch v-model:value="showRoutes" size="small" />
+        </label>
+        <label class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          Robot routes
+          <NSwitch v-model:value="showRobotRoutes" size="small" />
         </label>
       </template>
 
@@ -265,21 +313,6 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
             <pattern id="grid-dark" width="25" height="25" patternUnits="userSpaceOnUse">
               <path d="M 25 0 L 0 0 0 25" fill="none" stroke="#334155" stroke-width="0.6" />
             </pattern>
-            <filter id="robot-shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.25" />
-            </filter>
-
-            <!-- Тон спрайта по availability.state — та же таблица, что tintStyle для <img> -->
-            <filter v-for="(hue, state) in TINT_HUES" :id="'tint-' + state" :key="state">
-              <feColorMatrix type="hueRotate" :values="hue" />
-            </filter>
-            <filter id="tint-gray">
-              <feColorMatrix type="matrix"
-                values="0.33 0.33 0.33 0 0
-                        0.33 0.33 0.33 0 0
-                        0.33 0.33 0.33 0 0
-                        0    0    0    0.5 0" />
-            </filter>
           </defs>
 
           <rect x="0" y="0" width="100%" height="100%" class="fill-[url(#grid)] dark:fill-[url(#grid-dark)]" />
@@ -352,59 +385,39 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
             </text>
           </g>
 
+          <!-- Маршруты роботов: сплошная — разрешено ехать, пунктир — запланировано, ромбы — цели шагов -->
+          <g v-for="r in routeLines" :key="'route-' + r.id" fill="none" stroke-linecap="round" stroke-linejoin="round"
+             pointer-events="none" :opacity="r.selected || !selectedId ? 0.9 : 0.45">
+            <polyline v-if="r.released" :points="r.released" :stroke="r.color"
+                      :stroke-width="r.selected ? robotSize.width * 0.35 : 1.5" />
+            <polyline v-if="r.planned" :points="r.planned" :stroke="r.color"
+                      :stroke-width="r.selected ? robotSize.width * 0.2 : 1" stroke-dasharray="4 3" />
+            <rect v-for="goal in r.goals" :key="goal.id"
+                  :x="goal.x - 4" :y="goal.y - 4" width="8" height="8"
+                  :transform="`rotate(45 ${goal.x} ${goal.y})`"
+                  :stroke="r.color" :stroke-width="r.selected ? 1.8 : 1" class="fill-white dark:fill-slate-900" />
+          </g>
+
           <g
             v-for="m in markers"
             :key="m.id"
+            :transform="`translate(${m.px} ${m.py})`"
             style="cursor: pointer"
             @click.stop="selectedId = m.id"
             @mouseenter="hovered = m"
             @mouseleave="hovered = null"
           >
-            <circle
-              v-if="hovered && hovered.id === m.id"
-              :cx="m.px"
-              :cy="m.py"
-              :r="ROBOT_SIZE / 2 + 5"
-              fill="#f97316"
-              fill-opacity="0.28"
+            <!-- Невидимая подложка: попасть мышью по маленькому роботу -->
+            <circle :r="robotSize.length * 0.75" fill="transparent" />
+            <RobotShape
+              :length="robotSize.length"
+              :width="robotSize.width"
+              :look="m.look"
+              :rotate="m.rotateDeg"
+              :selected="m.id === selectedId || hovered?.id === m.id"
             />
-
-            <ellipse
-              :cx="m.px"
-              :cy="m.py + ROBOT_SIZE / 2 - 2"
-              :rx="ROBOT_SIZE / 2 - 3"
-              ry="2.5"
-              fill="black"
-              fill-opacity="0.18"
-            />
-
-            <image
-              :href="m.activeSprite"
-              :x="m.px - ROBOT_SIZE / 2"
-              :y="m.py - ROBOT_SIZE / 2"
-              :width="ROBOT_SIZE"
-              :height="ROBOT_SIZE"
-              :filter="m.tintFilter"
-            />
-
-            <g v-if="m.isTopView && !m.offline"
-               :transform="`translate(${m.px} ${m.py}) rotate(${m.rotateDeg})`">
-              <polygon
-                :points="`${ROBOT_SIZE / 2 + 3},0 ${ROBOT_SIZE / 2 + 9},-3 ${ROBOT_SIZE / 2 + 9},3`"
-                :fill="m.stroke"
-                stroke="white"
-                stroke-width="0.7"
-              />
-            </g>
-
-            <g :transform="`translate(${m.px + ROBOT_SIZE / 2 - 4} ${m.py - ROBOT_SIZE / 2 + 4})`">
-              <circle r="3.5" fill="white" />
-              <circle r="2.8" :fill="m.stroke" />
-            </g>
-
             <text
-              :x="m.px"
-              :y="m.py + ROBOT_SIZE / 2 + 10"
+              :y="robotSize.length * 0.75 + 7"
               text-anchor="middle"
               font-size="7"
               font-family="JetBrains Mono, monospace"
@@ -510,12 +523,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
       <div v-if="!selected" class="text-sm text-slate-500">Click a robot to see full details.</div>
       <div v-else class="flex flex-col gap-3 text-sm">
         <div class="grid place-items-center rounded bg-slate-100 py-3 dark:bg-slate-800">
-          <img
-            :src="previewSpriteFor(selected)"
-            :alt="selected.id"
-            class="h-32 w-32 object-contain"
-            :style="tintStyle(selected)"
-          />
+          <RobotIcon :robot="selected" :size="96" />
         </div>
         <div class="flex justify-between"><span class="text-slate-500">Model</span><span class="font-mono">{{ selected.model }}</span></div>
         <div class="flex justify-between">
@@ -531,6 +539,20 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
         <div class="flex justify-between"><span class="text-slate-500">Map</span><span class="font-mono text-xs">{{ selected.mapId || '-' }}</span></div>
         <div class="flex justify-between"><span class="text-slate-500">Last node</span><span class="font-mono text-xs">{{ selected.lastNodeId || '-' }}</span></div>
         <div class="flex justify-between"><span class="text-slate-500">Mission</span><span class="font-mono text-xs">{{ selected.mission || '-' }}</span></div>
+        <template v-if="selected.route">
+          <div class="flex justify-between">
+            <span class="text-slate-500">Step</span>
+            <span class="font-mono text-xs">{{ selected.route.stepIndex + 1 }} → {{ selected.route.goals[0] }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Nodes ahead</span>
+            <span class="font-mono text-xs">{{ Math.max(0, selected.route.released.nodes.length - 1) }}</span>
+          </div>
+          <div v-if="selected.route.nextMissionId" class="flex justify-between">
+            <span class="text-slate-500">Next mission</span>
+            <span class="font-mono text-xs">{{ selected.route.nextMissionId }}</span>
+          </div>
+        </template>
         <NButton
           size="small"
           :disabled="selected.connection !== 'ONLINE' || !!selected.mission"

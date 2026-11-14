@@ -13,6 +13,7 @@ export * as auth from './auth'
 export * as maps from './maps'
 export * as robots from './robots'
 export * as missions from './missions'
+export * as routes from './routes'
 export * as alerts from './alerts'
 
 export {

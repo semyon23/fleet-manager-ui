@@ -1,20 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
-const BASE = import.meta.env.BASE_URL
-
-const AMR_SPRITES = {
-  n: `${BASE}robots/amr-01/n.png`,
-  ne: `${BASE}robots/amr-01/ne.png`,
-  e: `${BASE}robots/amr-01/e.png`,
-  se: `${BASE}robots/amr-01/se.png`,
-  s: `${BASE}robots/amr-01/s.png`,
-  sw: `${BASE}robots/amr-01/sw.png`,
-  w: `${BASE}robots/amr-01/w.png`,
-  nw: `${BASE}robots/amr-01/nw.png`,
-  top: `${BASE}robots/amr-01/top.png`,
-}
-
 export const useRobotsStore = defineStore('robots', () => {
   // Стартуем ВСЕГДА с пустого списка — и в mock, и в real.
   // Демо-роботы удалены по фидбеку Семёна 2026-08-31: пользователь должен
@@ -93,7 +79,7 @@ export const useRobotsStore = defineStore('robots', () => {
   // Только что зарегистрированный робот (ответ api.robots.registerRobot) — сразу в список,
   // не дожидаясь опроса. Статус и готовность догонит следующий опрос.
   function addRobot(robot) {
-    robots.value.push({ ...robot, sprites: AMR_SPRITES })
+    robots.value.push({ ...robot })
   }
 
   // Локально убрать робота по id (после успешного api.robots.deleteRobot).
@@ -119,14 +105,9 @@ export const useRobotsStore = defineStore('robots', () => {
     }
   }
 
-  // Замерджить свежий список с бэка (GET /fms/robots). Известным роботам
-  // сохраняем sprites — их бэк не отдаёт, это фронтовое поле.
+  // Заменить список свежим с бэка (GET /fms/robots)
   function mergeRobots(freshList) {
-    const spritesById = new Map(robots.value.map((r) => [r.id, r.sprites]))
-    robots.value = freshList.map((r) => ({
-      ...r,
-      sprites: spritesById.get(r.id) || AMR_SPRITES,
-    }))
+    robots.value = freshList.map((r) => ({ ...r }))
   }
 
   return {
