@@ -1,7 +1,10 @@
 <script setup>
 import { useRoute } from 'vue-router'
-import { computed } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useBackendHealth } from '../composables/useBackendHealth'
+import { useRobotMqtt } from '../composables/useRobotMqtt'
+import { useRobotsStore } from '../stores/robots'
+import { livePositionsStatus, LEVEL_COLORS } from '../lib/livePositions'
 import AppClock from './AppClock.vue'
 
 const route = useRoute()
@@ -16,6 +19,23 @@ const healthTitle = computed(() => {
   if (health.lastCheckedAt.value) parts.push(`checked ${health.lastCheckedAt.value.toLocaleTimeString()}`)
   return parts.join(' · ')
 })
+
+// Живые позы роботов из MQTT: идут ли они на самом деле (пароль, топики), а не только «подключено»
+const mqtt = useRobotMqtt()
+const robots = useRobotsStore()
+const now = ref(Date.now())
+let tick = null
+onMounted(() => { tick = setInterval(() => { now.value = Date.now() }, 2000) })
+onBeforeUnmount(() => clearInterval(tick))
+const live = computed(() => livePositionsStatus({
+  state: mqtt.state.value,
+  lastError: mqtt.lastError.value,
+  lastPoseAt: mqtt.lastPoseAt.value,
+  onlineRobots: robots.robots.filter((r) => r.connection === 'ONLINE').length,
+  hasPassword: !!window.__FLEET_CONFIG__?.mqttPassword,
+  prefix: mqtt.topicPrefix(),
+  now: now.value,
+}))
 </script>
 
 <template>
@@ -26,6 +46,14 @@ const healthTitle = computed(() => {
       <h1 class="truncate text-lg font-semibold text-slate-900 dark:text-slate-100">{{ title }}</h1>
     </div>
     <div class="flex items-center gap-3 lg:gap-4">
+      <span
+        v-if="live.level !== 'off'"
+        class="flex cursor-help items-center gap-1.5 font-mono text-xs text-slate-500 dark:text-slate-400"
+        :title="live.hint"
+      >
+        <span class="inline-block h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: LEVEL_COLORS[live.level] }" />
+        {{ live.label }}
+      </span>
       <router-link
         to="/settings"
         class="flex items-center gap-2 font-mono text-xs text-slate-500 hover:text-brand-800 dark:text-slate-400 dark:hover:text-brand-300"

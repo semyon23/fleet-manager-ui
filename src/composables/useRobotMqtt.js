@@ -37,6 +37,7 @@ function topicsFor(key) {
 
 const state = ref('idle')  // 'idle' | 'connecting' | 'open' | 'closed' | 'error' | 'disabled'
 const lastError = ref(null)
+const lastPoseAt = ref(null)   // когда пришла последняя поза — для индикатора «живые позы» в шапке
 let client = null
 // manufacturer/serialNumber → id робота. Источник правды для подписок: при реконнекте переподписываемся по ней.
 const subscriptions = new Map()
@@ -50,6 +51,7 @@ function flushPoses() {
   rafId = null
   const store = useRobotsStore()
   for (const [robotId, pose] of pendingPose) store.applyTelemetry(robotId, pose)
+  if (pendingPose.size) lastPoseAt.value = Date.now()
   pendingPose.clear()
 }
 
@@ -166,6 +168,8 @@ export function useRobotMqtt() {
   return {
     state: readonly(state),
     lastError: readonly(lastError),
+    lastPoseAt: readonly(lastPoseAt),
+    topicPrefix,
     connect,
     disconnect,
     subscribeRobot,
