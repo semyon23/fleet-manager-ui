@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   stateOf, canCancel, isFinished, progressOf, toCreateRequest, stepErrors, formErrors, MISSION_STATES,
+  formatDuration, timingOf, formatEvent,
 } from '../../src/lib/missions'
 import * as S from '../../src/api/schemas'
 
@@ -85,5 +86,45 @@ describe('missions — 400 INVALID_INPUT details by field', () => {
   it('the rest belongs to the form', () => {
     expect(formErrors(details)).toEqual(['name: required: a non-empty string'])
     expect(formErrors(undefined)).toEqual([])
+  })
+})
+
+describe('missions — card and history', () => {
+  it('durations for people', () => {
+    expect(formatDuration(42_400)).toBe('42 s')
+    expect(formatDuration(185_000)).toBe('3 m 05 s')
+    expect(formatDuration(4_320_000)).toBe('1 h 12 m')
+    expect(formatDuration(null)).toBe('—')
+  })
+
+  it('timing — waited, ran, total; running mission counts up to now', () => {
+    const done = mission({ createdAt: '2026-11-14T10:00:00.000Z', startedAt: '2026-11-14T10:00:30.000Z',
+                           finishedAt: '2026-11-14T10:02:30.000Z' })
+    expect(timingOf(done)).toEqual({ waited: 30_000, ran: 120_000, total: 150_000 })
+
+    const queued = mission({ createdAt: '2026-11-14T10:00:00.000Z' })
+    expect(timingOf(queued, Date.parse('2026-11-14T10:00:20.000Z'))).toEqual({ waited: 20_000, ran: null, total: 20_000 })
+
+    const canceledInQueue = mission({ createdAt: '2026-11-14T10:00:00.000Z', finishedAt: '2026-11-14T10:00:05.000Z' })
+    expect(timingOf(canceledInQueue)).toEqual({ waited: 5_000, ran: null, total: 5_000 })
+  })
+
+  const m = mission()
+  const at = '2026-11-14T10:00:00.000Z'
+
+  it('STATE — label, robot of the assignment, reason, error', () => {
+    expect(formatEvent({ type: 'STATE', state: 'ASSIGNED', robotId: 'amr-01', reason: '12.3 s to the first step', at }, m))
+      .toEqual({ title: 'Assigned', detail: 'amr-01 · 12.3 s to the first step', color: MISSION_STATES.ASSIGNED.color })
+    expect(formatEvent({ type: 'STATE', state: 'QUEUED', robotId: 'amr-01', reason: 'robot went offline', at }, m).detail)
+      .toBe('robot went offline')
+    expect(formatEvent({ type: 'STATE', state: 'FAILED', robotId: 'amr-01', error: { code: 'NO_ROUTE', message: 'map changed' }, at }, m).detail)
+      .toBe('NO_ROUTE: map changed')
+  })
+
+  it('STEP and ACTION — step number from 1 and its node', () => {
+    expect(formatEvent({ type: 'STEP', stepIndex: 1, state: 'COMPLETED', at }, m))
+      .toMatchObject({ title: 'Step 2 completed', detail: '→ b' })
+    expect(formatEvent({ type: 'ACTION', stepIndex: 0, actionType: 'pick', status: 'FAILED', at }, m))
+      .toMatchObject({ title: 'pick failed', detail: 'step 1 at a', color: '#ef4444' })
   })
 })

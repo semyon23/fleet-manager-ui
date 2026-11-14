@@ -86,3 +86,58 @@ export function formErrors(details) {
     .filter(([path]) => !path.startsWith('steps['))
     .map(([path, message]) => `${path}: ${message}`)
 }
+
+// === Карточка и история (контракт 7.3) ===
+
+// Длительность для людей: 42 s, 3 m 05 s, 1 h 12 m
+export function formatDuration(ms) {
+  if (ms === null || ms === undefined || ms < 0) return '—'
+  const s = Math.round(ms / 1000)
+  if (s < 60) return `${s} s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m} m ${String(s % 60).padStart(2, '0')} s`
+  return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} m`
+}
+
+const between = (from, to) => (from && to ? Date.parse(to) - Date.parse(from) : null)
+
+// Ждала (создана → начата), выполнялась (начата → конец), всего. Не закончена — до now
+export function timingOf(mission, now = Date.now()) {
+  const end = mission?.finishedAt || new Date(now).toISOString()
+  return {
+    waited: between(mission?.createdAt, mission?.startedAt || end),
+    ran: mission?.startedAt ? between(mission.startedAt, end) : null,
+    total: between(mission?.createdAt, end),
+  }
+}
+
+/**
+ * Событие истории → строка ленты: заголовок, подробность и цвет точки.
+ * mission нужна, чтобы назвать узел шага.
+ */
+export function formatEvent(event, mission) {
+  const step = event.stepIndex
+  const node = step !== undefined ? mission?.steps?.[step]?.nodeId : null
+  if (event.type === 'STATE') {
+    const meta = MISSION_STATES[event.state] || UNKNOWN
+    const parts = []
+    if (event.state === 'ASSIGNED' && event.robotId) parts.push(event.robotId)
+    if (event.reason) parts.push(event.reason)
+    if (event.error) parts.push(`${event.error.code}: ${event.error.message}`)
+    return { title: meta.label, detail: parts.join(' · '), color: meta.color }
+  }
+  if (event.type === 'STEP') {
+    const meta = { RUNNING: '#3b82f6', COMPLETED: '#22c55e', FAILED: '#ef4444' }
+    return {
+      title: `Step ${step + 1} ${String(event.state).toLowerCase()}`,
+      detail: node ? `→ ${node}` : '',
+      color: meta[event.state] || '#94a3b8',
+    }
+  }
+  const meta = { FINISHED: '#22c55e', FAILED: '#ef4444', RUNNING: '#3b82f6' }
+  return {
+    title: `${event.actionType} ${String(event.status).toLowerCase()}`,
+    detail: `step ${step + 1}${node ? ` at ${node}` : ''}`,
+    color: meta[event.status] || '#94a3b8',
+  }
+}

@@ -1,11 +1,13 @@
 <script setup>
 import { ref, computed, watch, h, onMounted, onBeforeUnmount } from 'vue'
 import {
-  NCard, NDataTable, NTag, NButton, NModal, NInput, NSelect, NEmpty, NPopconfirm, useMessage,
+  NCard, NDataTable, NTag, NButton, NModal, NInput, NSelect, NEmpty, NPopconfirm, NTabs, NTabPane, useMessage,
 } from 'naive-ui'
 import { useMapsStore } from '../stores/maps'
 import { useRobotsStore } from '../stores/robots'
 import ActionListEditor from '../components/editor/ActionListEditor.vue'
+import MissionDrawer from '../components/MissionDrawer.vue'
+import MissionHistory from '../components/MissionHistory.vue'
 import * as api from '../api'
 import {
   ACTIVE_STATES, FINISHED_STATES, PRIORITIES, stateOf, canCancel, progressOf,
@@ -53,6 +55,14 @@ async function cancel(mission) {
   }
 }
 
+// === Карточка миссии ===
+const openedId = ref(null)
+const showDrawer = ref(false)
+function openMission(id) {
+  openedId.value = id
+  showDrawer.value = true
+}
+
 // === Таблицы ===
 const time = (iso) => (iso ? new Date(iso).toLocaleTimeString() : '—')
 const tag = (meta) => h(NTag, { size: 'small', bordered: false, color: { color: meta.color, textColor: 'white' } }, { default: () => meta.label })
@@ -60,8 +70,8 @@ const tag = (meta) => h(NTag, { size: 'small', bordered: false, color: { color: 
 const commonColumns = [
   {
     title: 'Mission', key: 'id',
-    render: (m) => h('div', { class: 'flex flex-col' }, [
-      h('span', { class: 'font-mono text-xs text-brand-800 dark:text-brand-300' }, m.id),
+    render: (m) => h('button', { class: 'flex flex-col text-left', onClick: () => openMission(m.id) }, [
+      h('span', { class: 'font-mono text-xs text-brand-800 hover:underline dark:text-brand-300' }, m.id),
       h('span', { class: 'text-xs text-slate-500' }, m.name),
     ]),
   },
@@ -186,33 +196,39 @@ async function submit() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <NCard title="Missions" size="small" class="!bg-white dark:!bg-slate-900">
-      <template #header-extra>
-        <NButton type="primary" size="small" :disabled="!maps.maps.length" @click="openBuilder">+ Create mission</NButton>
-      </template>
-
-      <div v-if="loadError" class="mb-3 rounded bg-rose-50 p-2 text-xs text-rose-700 dark:bg-rose-950 dark:text-rose-300">
-        {{ loadError }}
-      </div>
-
-      <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">Active — {{ active.length }}</div>
-      <NEmpty v-if="!active.length" class="py-6"
-              :description="maps.maps.length ? 'No active missions' : 'Upload a map first — missions run on a map'">
-        <template v-if="maps.maps.length" #extra>
-          <NButton size="small" @click="openBuilder">Create a mission</NButton>
+  <div>
+    <NCard size="small" class="!bg-white dark:!bg-slate-900">
+      <NTabs type="line" default-value="current" animated>
+        <template #suffix>
+          <NButton type="primary" size="small" :disabled="!maps.maps.length" @click="openBuilder">+ Create mission</NButton>
         </template>
-      </NEmpty>
-      <NDataTable v-else :columns="activeColumns" :data="active" :bordered="false" size="small" :row-key="(m) => m.id" />
+
+        <NTabPane name="current" tab="Current">
+          <div v-if="loadError" class="mb-3 rounded bg-rose-50 p-2 text-xs text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+            {{ loadError }}
+          </div>
+
+          <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">Active — {{ active.length }}</div>
+          <NEmpty v-if="!active.length" class="py-6"
+                  :description="maps.maps.length ? 'No active missions' : 'Upload a map first — missions run on a map'">
+            <template v-if="maps.maps.length" #extra>
+              <NButton size="small" @click="openBuilder">Create a mission</NButton>
+            </template>
+          </NEmpty>
+          <NDataTable v-else :columns="activeColumns" :data="active" :bordered="false" size="small" :row-key="(m) => m.id" />
+
+          <div class="mb-2 mt-6 text-xs text-slate-500 dark:text-slate-400">Recently finished — last {{ RECENT }}</div>
+          <NEmpty v-if="!finished.length" class="py-4" description="Nothing finished yet" />
+          <NDataTable v-else :columns="finishedColumns" :data="finished" :bordered="false" size="small" :row-key="(m) => m.id" />
+        </NTabPane>
+
+        <NTabPane name="history" tab="History" display-directive="show:lazy">
+          <MissionHistory @open="openMission" />
+        </NTabPane>
+      </NTabs>
     </NCard>
 
-    <NCard title="Recently finished" size="small" class="!bg-white dark:!bg-slate-900">
-      <template #header-extra>
-        <span class="text-xs text-slate-500 dark:text-slate-400">last {{ RECENT }}</span>
-      </template>
-      <NEmpty v-if="!finished.length" class="py-4" description="Nothing finished yet" />
-      <NDataTable v-else :columns="finishedColumns" :data="finished" :bordered="false" size="small" :row-key="(m) => m.id" />
-    </NCard>
+    <MissionDrawer v-model:show="showDrawer" :mission-id="openedId" @changed="refresh" />
 
     <!-- ============================================================= -->
     <!-- Мастер создания                                                -->
