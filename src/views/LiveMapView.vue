@@ -401,8 +401,8 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
           <g
             v-for="m in markers"
             :key="m.id"
-            :transform="`translate(${m.px} ${m.py})`"
-            style="cursor: pointer"
+            class="robot-marker"
+            :style="{ transform: `translate(${m.px}px, ${m.py}px)` }"
             @click.stop="selectedId = m.id"
             @mouseenter="hovered = m"
             @mouseleave="hovered = null"
@@ -566,3 +566,12 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
     <PlaceRobotDialog v-model:show="showPlace" :robot="selected" />
   </div>
 </template>
+
+<style scoped>
+/* Поза приходит ~5 раз в секунду (MQTT visualization) — между ними робот доезжает плавно, а не прыгает.
+   Только сдвиг: поворот без перехода, иначе при переходе через ±180° робот крутился бы через весь круг */
+.robot-marker {
+  cursor: pointer;
+  transition: transform 200ms linear;
+}
+</style>

@@ -88,12 +88,18 @@ export const useRobotsStore = defineStore('robots', () => {
     robots.value = robots.value.filter((r) => r.id !== id)
   }
 
+  // Когда поза робота пришла из MQTT. Пока она свежая, опрос REST позу не трогает: в базе поза старше
+  // (dispatch пишет её не чаще раза в секунду), и робот на карте прыгал бы назад раз в 5 с
+  const POSE_FRESH_MS = 3000
+  const poseAt = new Map()
+
   // Патч от MQTT (useRobotMqtt): поза из visualization, потеря связи из connection.
   // Только для уже известных роботов — нового подтянет опрос. Остальное не трогаем: это данные fms.
   function applyTelemetry(robotId, patch) {
     const idx = robots.value.findIndex((r) => r.id === robotId)
     if (idx === -1) return
     const cur = robots.value[idx]
+    if (patch.x !== undefined) poseAt.set(robotId, Date.now())
     robots.value[idx] = {
       ...cur,
       x: patch.x ?? cur.x,
@@ -105,9 +111,15 @@ export const useRobotsStore = defineStore('robots', () => {
     }
   }
 
-  // Заменить список свежим с бэка (GET /fms/robots)
+  // Заменить список свежим с бэка (GET /fms/robots). Поза — из MQTT, если она свежая (см. poseAt)
   function mergeRobots(freshList) {
-    robots.value = freshList.map((r) => ({ ...r }))
+    const now = Date.now()
+    const previous = new Map(robots.value.map((r) => [r.id, r]))
+    robots.value = freshList.map((r) => {
+      const cur = previous.get(r.id)
+      if (!cur || !(now - (poseAt.get(r.id) || 0) < POSE_FRESH_MS)) return { ...r }
+      return { ...r, x: cur.x, y: cur.y, theta: cur.theta, mapId: cur.mapId }
+    })
   }
 
   return {
