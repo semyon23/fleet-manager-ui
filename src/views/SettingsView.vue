@@ -3,11 +3,18 @@ import { ref } from 'vue'
 import { NCard, NInput, NButton, NTabs, NTabPane, NSwitch, NTag, NRadioGroup, NRadioButton, useMessage } from 'naive-ui'
 import { getMockMode, setMockMode, getBaseUrl } from '../api'
 import { useTheme } from '../composables/useTheme'
+import { askBeforeRisky, setAskBeforeRisky } from '../composables/useRiskyAction'
 
 const msg = useMessage()
 const useMocks = ref(getMockMode())
 const baseUrl = ref(getBaseUrl())
 const { mode: themeMode, setMode: setThemeMode } = useTheme()
+const askRisky = ref(askBeforeRisky())
+
+function toggleAskRisky(v) {
+  askRisky.value = v
+  setAskBeforeRisky(v)
+}
 
 function toggleMocks(v) {
   useMocks.value = v
@@ -74,6 +81,21 @@ function toggleMocks(v) {
 
       <NTabPane name="general" tab="General">
         <div class="grid max-w-lg grid-cols-1 gap-6">
+          <div class="rounded border border-slate-200 p-4 dark:border-slate-700">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <div class="text-sm font-semibold">Ask before risky actions</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  When an action has consequences — a map save leaves a dead end or removes the node a robot
+                  stands on, deleting a robot cancels its mission — show them and ask first.
+                  Off — do it at once and show the consequences as a notification.
+                  Saved in this browser.
+                </div>
+              </div>
+              <NSwitch :value="askRisky" @update:value="toggleAskRisky" />
+            </div>
+          </div>
+
           <div class="rounded border border-slate-200 dark:border-slate-700 p-4">
             <div class="mb-3 text-sm font-semibold">Theme</div>
             <NRadioGroup :value="themeMode.value" @update:value="setThemeMode">

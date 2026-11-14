@@ -133,11 +133,12 @@ export const useMapsStore = defineStore('maps', () => {
     return update(id, { meta: { ...map.meta, ...metaPatch } })
   }
 
-  // PATCH с версией. Ошибки (409 VERSION_CONFLICT, 400 INVALID_MAP, ...) — ApiError, решает экран.
-  async function save(id) {
+  // PATCH с версией. Ошибки (409 VERSION_CONFLICT, 409 CONFIRMATION_REQUIRED, 400 INVALID_MAP, ...) —
+  // ApiError, решает экран; force — оператор согласился с последствиями
+  async function save(id, { force = false } = {}) {
     const map = get(id)
     if (!map?.full) throw new Error(`map ${id} is not open`)
-    const saved = await api.maps.updateMap(id, { version: map.version, ...editable(map) })
+    const saved = await api.maps.updateMap(id, { version: map.version, ...editable(map) }, { force })
     const latest = get(id)
     if (latest !== map) {
       // Правили, пока сохраняли: правки остаются несохранёнными, но уже поверх новой версии

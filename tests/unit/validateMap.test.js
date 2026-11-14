@@ -104,12 +104,20 @@ describe('validateMap', () => {
     expect(v.warnings.some((w) => w.includes('interactionNodeIds пусто'))).toBe(true)
   })
 
+  it('ошибка на maxSpeed 0 — по такому ребру не проехать', () => {
+    const v = validateMap(makeMap({
+      waypoints: [{ id: 'a', u: 0, v: 0 }, { id: 'b', u: 1, v: 1 }],
+      edges: [{ id: 'e1', from: 'a', to: 'b', maxSpeed: 0 }],
+    }))
+    expect(v.errors.some((e) => e.includes('maxSpeed must be > 0'))).toBe(true)
+  })
+
   it('ошибка на отрицательный maxSpeed', () => {
     const v = validateMap(makeMap({
       waypoints: [{ id: 'a', u: 0, v: 0 }, { id: 'b', u: 1, v: 1 }],
       edges: [{ id: 'e1', from: 'a', to: 'b', maxSpeed: -1 }],
     }))
-    expect(v.errors.some((e) => e.includes('maxSpeed < 0'))).toBe(true)
+    expect(v.errors.some((e) => e.includes('maxSpeed must be > 0'))).toBe(true)
   })
 
   it('валидная сцена: 2 ноды, 1 edge — чисто', () => {

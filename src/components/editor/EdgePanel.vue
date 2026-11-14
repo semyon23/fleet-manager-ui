@@ -52,7 +52,7 @@ const ORIENTATION_HINTS = {
       <div class="grid grid-cols-2 gap-2">
         <label class="flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
           Max speed (m/s)
-          <NInputNumber :value="edge.maxSpeed" size="small" :min="0" :step="0.1" @update:value="(v) => update({ maxSpeed: v ?? 1 })" />
+          <NInputNumber :value="edge.maxSpeed" size="small" :min="0.01" :step="0.1" @update:value="(v) => update({ maxSpeed: v ?? 1 })" />
         </label>
         <label class="flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
           Cost

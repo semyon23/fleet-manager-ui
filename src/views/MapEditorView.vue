@@ -26,6 +26,7 @@ import {
   snapDirection, snapToRay,
 } from '../lib/geometry'
 import { useTheme } from '../composables/useTheme'
+import { useRiskyAction } from '../composables/useRiskyAction'
 import {
   NButton,
   NInput,
@@ -43,6 +44,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useMapsStore()
 const msg = useMessage()
+const risky = useRiskyAction()
 const { isDark } = useTheme()
 
 // Только полная карта (store.open): строка из списка карт без графа редактору не годится
@@ -768,9 +770,14 @@ async function doExportLifMulti() {
   msg.success(`Exported multi-layout LIF: ${l.layouts.length} layouts`)
 }
 // PATCH /fms/maps/:id с версией, которую загрузили (store.save); в mock-режиме — в localStorage
+// Последствия (тупик, отрезанная часть, робот теряет узел) — 409 CONFIRMATION_REQUIRED: спросить оператора (6.3)
 async function saveToBackend() {
   try {
-    const saved = await store.save(map.value.id)
+    const saved = await risky((force) => store.save(map.value.id, { force }), {
+      title: 'Saving this map has consequences',
+      positiveText: 'Save anyway',
+    })
+    if (!saved) return msg.info('Not saved')
     msg.success(`Saved v${saved.version}${api.getMockMode() ? ' (mock)' : ''}`)
   } catch (e) {
     if (e instanceof api.ApiError && e.code === 'VERSION_CONFLICT') {

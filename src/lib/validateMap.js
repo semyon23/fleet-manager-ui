@@ -65,9 +65,9 @@ export function validateMap(map) {
     }
   }
 
-  // 7. Отрицательные speed / cost
+  // 7. Скорость ребра > 0 (как проверяет fms: по ребру со скоростью 0 не проехать), cost < 0 — предупреждение
   for (const e of edges) {
-    if (e.maxSpeed != null && e.maxSpeed < 0) errors.push(`Edge ${e.id}: maxSpeed < 0`)
+    if (e.maxSpeed != null && !(e.maxSpeed > 0)) errors.push(`Edge ${e.id}: maxSpeed must be > 0`)
     if (e.cost != null && e.cost < 0) warnings.push(`Edge ${e.id}: cost < 0`)
   }
 

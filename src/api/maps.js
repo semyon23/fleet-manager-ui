@@ -22,14 +22,17 @@ export async function getMap(id) {
   return request('GET', `/fms/maps/${encodeURIComponent(id)}`, { schema: MapEntity })
 }
 
-export async function createMap(payload) {
+// force: сохранить, несмотря на последствия (409 CONFIRMATION_REQUIRED, контракт 6.3)
+const forceQuery = (force) => (force ? { force: 'true' } : undefined)
+
+export async function createMap(payload, { force = false } = {}) {
   if (getMockMode()) return withMockDelay(mocks.createMap(payload))
-  return request('POST', '/fms/maps', { body: payload, schema: MapEntity })
+  return request('POST', '/fms/maps', { body: payload, query: forceQuery(force), schema: MapEntity })
 }
 
-export async function updateMap(id, patch) {
+export async function updateMap(id, patch, { force = false } = {}) {
   if (getMockMode()) return withMockDelay(mocks.updateMap(id, patch))
-  return request('PATCH', `/fms/maps/${encodeURIComponent(id)}`, { body: patch, schema: MapEntity })
+  return request('PATCH', `/fms/maps/${encodeURIComponent(id)}`, { body: patch, query: forceQuery(force), schema: MapEntity })
 }
 
 export async function deleteMap(id) {

@@ -1,5 +1,5 @@
 <script setup>
-import { NConfigProvider, NMessageProvider, darkTheme } from 'naive-ui'
+import { NConfigProvider, NMessageProvider, NDialogProvider, darkTheme } from 'naive-ui'
 import { onMounted, onBeforeUnmount, computed, ref, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import AppSidebar from './components/AppSidebar.vue'
@@ -43,6 +43,7 @@ onBeforeUnmount(() => {
 <template>
   <NConfigProvider :theme="naiveTheme" :theme-overrides="themeOverrides">
     <NMessageProvider>
+    <NDialogProvider>
       <div class="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
         <AppSidebar :collapsed="collapsed" @toggle="collapsed = !collapsed" />
         <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -52,6 +53,7 @@ onBeforeUnmount(() => {
           </main>
         </div>
       </div>
+    </NDialogProvider>
     </NMessageProvider>
   </NConfigProvider>
 </template>

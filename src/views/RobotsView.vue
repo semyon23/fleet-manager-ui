@@ -10,6 +10,7 @@ import { AVAILABILITY_OPTIONS, availabilityOf } from '../lib/availability'
 import * as api from '../api'
 import { subscribeRobot, unsubscribeRobot } from '../composables/useRobotMqtt'
 import PlaceRobotDialog from '../components/PlaceRobotDialog.vue'
+import { useRiskyAction } from '../composables/useRiskyAction'
 
 const store = useRobotsStore()
 const msg = useMessage()
@@ -49,23 +50,23 @@ function connectionErrorText(e) {
 }
 
 // === Delete ===
-// Робот с миссией: сервер отвечает ROBOT_BUSY — спрашиваем, удалить ли с отменой миссии (?force=true)
-const busyRobot = ref(null)   // { id, mission } — открыт диалог «робот занят»
+// Робот с миссией: сервер отвечает ROBOT_BUSY — спросить (или нет, по настройке оператора) и удалить с
+// отменой миссии (?force=true)
+const risky = useRiskyAction()
 
-async function deleteRobot(id, force = false) {
+async function deleteRobot(id) {
   try {
-    await api.robots.deleteRobot(id, { force })
+    const forced = await risky((force) => api.robots.deleteRobot(id, { force }).then(() => force), {
+      title: `Robot ${id} is busy`,
+      positiveText: 'Delete and cancel mission',
+      note: 'Deleting it cancels the mission and stops the robot.',
+    })
+    if (forced === null) return
     store.removeRobot(id)
     unsubscribeRobot(id)
     if (selectedId.value === id) { selectedId.value = null; showDrawer.value = false }
-    busyRobot.value = null
-    msg.success(force ? `Robot "${id}" deleted, its mission is canceled` : `Robot "${id}" deleted`)
+    msg.success(forced ? `Robot "${id}" deleted, its mission is canceled` : `Robot "${id}" deleted`)
   } catch (e) {
-    if (e?.code === 'ROBOT_BUSY' && !force) {
-      busyRobot.value = { id, mission: store.robots.find((r) => r.id === id)?.mission }
-      return
-    }
-    busyRobot.value = null
     if (e?.code === 'NOT_FOUND') msg.error(`Robot "${id}" is already deleted`)
     else msg.error(connectionErrorText(e) || `Failed to delete robot "${id}"`)
   }
@@ -415,24 +416,5 @@ async function submitRegister() {
 
     <PlaceRobotDialog v-model:show="showPlace" :robot="selectedRobot" />
 
-    <!-- Робот занят: удалить с отменой миссии? -->
-    <NModal
-      :show="!!busyRobot"
-      preset="dialog"
-      type="warning"
-      title="Robot is busy"
-      positive-text="Delete and cancel mission"
-      negative-text="Keep the robot"
-      @positive-click="deleteRobot(busyRobot.id, true)"
-      @negative-click="busyRobot = null"
-      @close="busyRobot = null"
-      @mask-click="busyRobot = null"
-    >
-      <template v-if="busyRobot">
-        Robot "{{ busyRobot.id }}" is executing mission
-        <span class="font-mono">{{ busyRobot.mission || '' }}</span>.
-        Deleting it cancels the mission and stops the robot.
-      </template>
-    </NModal>
   </NCard>
 </template>
