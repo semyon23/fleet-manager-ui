@@ -16,6 +16,9 @@ const props = defineProps({
   scope: { type: String, required: true },
   withId: { type: Boolean, default: true },
   title: { type: String, default: 'Actions' },
+  // Миссия (контракт 7.1): у действия только тип, blocking и параметры — без описания и retriable,
+  // blocking по умолчанию HARD, как в fms
+  missionStep: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:actions'])
 
@@ -31,7 +34,9 @@ function commit(list) {
 }
 
 function addAction() {
-  const a = { actionType: '', blockingType: 'NONE', actionDescriptor: '', actionParameters: [] }
+  const a = props.missionStep
+    ? { actionType: '', blockingType: 'HARD', actionParameters: [] }
+    : { actionType: '', blockingType: 'NONE', actionDescriptor: '', actionParameters: [] }
   if (props.withId) a.actionId = newActionId()
   commit([...props.actions, a])
 }
@@ -109,7 +114,7 @@ function paramHint(a, key) {
           </select>
           <button class="rounded px-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40" title="Remove action" @click="removeAction(i)">×</button>
         </div>
-        <div class="mb-1.5 flex items-center gap-2">
+        <div v-if="!missionStep" class="mb-1.5 flex items-center gap-2">
           <NInput
             :value="a.actionDescriptor || ''"
             size="tiny"

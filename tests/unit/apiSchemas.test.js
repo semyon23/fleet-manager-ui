@@ -21,9 +21,10 @@ describe('API schemas — happy path', () => {
 
   it('Mission requires createdAt as ISO', () => {
     const bad = S.Mission.safeParse({
-      id: 'M', name: 'x', mapId: 'm', status: 'pending',
-      robotId: null, nodeIds: [],
-      createdAt: 'yesterday', updatedAt: 'yesterday',
+      id: 'm-1', name: 'x', mapId: 'm', priority: 'NORMAL', requestedRobotId: null, robotId: null,
+      steps: [{ nodeId: 'n1' }], state: 'QUEUED', currentStep: null, stepStates: [], error: null,
+      createdAt: 'yesterday', assignedAt: null, startedAt: null, finishedAt: null, updatedAt: 'yesterday',
+      createdBy: null,
     })
     expect(bad.success).toBe(false)
   })
@@ -34,13 +35,6 @@ describe('API schemas — happy path', () => {
       createdAt: '2026-08-27T11:00:00Z',
     })
     expect(ok.acknowledged).toBe(false)
-  })
-
-  it('CreateMissionRequest requires >= 2 nodeIds', () => {
-    const bad = S.CreateMissionRequest.safeParse({
-      name: 'x', mapId: 'm', nodeIds: ['only-one'],
-    })
-    expect(bad.success).toBe(false)
   })
 
   it('Waypoint action blockingType must be enum', () => {

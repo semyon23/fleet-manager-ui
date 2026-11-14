@@ -248,25 +248,60 @@ export function toViewRobot(r) {
   }
 }
 
-// === Missions ===
+// === Миссии (контракт v2, раздел 7) ===
+export const MISSION_STATE_VALUES = ['QUEUED', 'ASSIGNED', 'RUNNING', 'PAUSED', 'CANCELING', 'COMPLETED', 'FAILED', 'CANCELED']
+export const PRIORITY_VALUES = ['LOW', 'NORMAL', 'HIGH', 'CRITICAL']
+
+const MissionAction = z.object({
+  actionType: z.string(),
+  blockingType: z.string().optional(),
+  actionParameters: z.array(z.object({ key: z.string(), value: z.any() })).optional(),
+}).passthrough()
+
+const MissionStep = z.object({
+  nodeId: z.string(),
+  actions: z.array(MissionAction).default([]),
+})
+
+const StepState = z.object({
+  state: z.string(),
+  startedAt: IsoDateTime.nullable(),
+  finishedAt: IsoDateTime.nullable(),
+  waitingForTraffic: z.boolean().default(false),
+  actions: z.array(z.object({ actionId: z.string(), actionType: z.string(), status: z.string() }).passthrough()).default([]),
+}).passthrough()
+
 export const Mission = z.object({
   id: z.string(),
   name: z.string(),
   mapId: z.string(),
-  status: z.enum(['pending', 'running', 'succeeded', 'failed', 'cancelled']),
+  priority: z.enum(PRIORITY_VALUES),
+  requestedRobotId: z.string().nullable(),
   robotId: z.string().nullable(),
-  nodeIds: z.array(z.string()),
+  steps: z.array(MissionStep),
+  state: z.enum(MISSION_STATE_VALUES),
+  currentStep: z.number().int().nullable(),
+  stepStates: z.array(StepState),
+  error: z.object({ code: z.string(), message: z.string() }).nullable(),
   createdAt: IsoDateTime,
+  assignedAt: IsoDateTime.nullable(),
+  startedAt: IsoDateTime.nullable(),
+  finishedAt: IsoDateTime.nullable(),
   updatedAt: IsoDateTime,
-})
-export const MissionList = z.array(Mission)
-// Робота НЕ передаём — бэк-диспетчер сам выберет свободного и вернёт его в Mission.robotId
-export const CreateMissionRequest = z.object({
-  name: z.string().min(1),
-  mapId: z.string(),
-  nodeIds: z.array(z.string()).min(2),
-  priority: z.enum(['low', 'normal', 'high', 'critical']).optional().default('normal'),
-})
+  createdBy: z.string().nullable(),
+}).passthrough()
+
+export const MissionPage = z.object({ items: z.array(Mission), nextCursor: z.string().nullable() })
+
+// Событие истории миссии (7.3): общие поля + поля своего type (state, reason, error, stepIndex, ...)
+export const MissionEvent = z.object({
+  id: z.number(),
+  missionId: z.string(),
+  at: IsoDateTime,
+  robotId: z.string().nullable(),
+  type: z.enum(['STATE', 'STEP', 'ACTION']),
+}).passthrough()
+export const MissionEventList = z.object({ items: z.array(MissionEvent) })
 
 // === Маршруты роботов (контракт 7.4) ===
 const RoutePart = z.object({ nodes: z.array(z.string()), edges: z.array(z.string()) })
