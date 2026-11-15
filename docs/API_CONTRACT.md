@@ -2,6 +2,8 @@
 
 Версия 2 (черновик), 2026-10-14. Заменяет версию от 2026-08-27.
 Правка 2026-10-14: WebSocket fms убран — обновления опросом REST, позже события fms в MQTT (раздел 9).
+Правка 2026-11-15: тревоги — правила fms, подтверждение, закрытие при удалении робота (8.1–8.3); журнал
+`GET /fms/events` (8.4).
 Правка 2026-11-14: миссии — как они работают в fms (раздел 7): свой `id` и повтор запроса, проверки
 при создании, отмена, следующая миссия робота; история миссии (7.3), маршруты роботов (7.4), период
 `from`/`to` в списке миссий, ошибка `CONFIRMATION_REQUIRED` (2.1, 6.3).
@@ -685,26 +687,56 @@ GET /fms/routes?mapId=map-a1      // mapId необязателен: без не
 
 ---
 
-## 8. Тревоги (alarms)
+## 8. Тревоги и журнал
+
+Два разных потока, их не смешиваем:
+
+- **тревоги** (8.1–8.3) — только то, что требует человека; у тревоги жизненный цикл, их мало;
+- **журнал** (8.4) — всё, что произошло: миссии, роботы, тревоги, действия оператора, система; только
+  дописывается, его много.
+
+Иначе важная авария тонет среди тысяч «миссия выполнена» (поток тревог, ISA-18.2).
 
 ### 8.1. Объект `Alarm`
 
 ```jsonc
 {
-  "id": "al-5512",
-  "severity": "WARNING",              // INFO | WARNING | ERROR | CRITICAL
+  "id": "al-8h1xvhwx",                // выдаёт fms
+  "severity": "ERROR",                // INFO | WARNING | ERROR | CRITICAL
   "source": "ROBOT",                  // ROBOT | MISSION | TRAFFIC | SYSTEM
-  "code": "batteryLow",               // для ROBOT — errorType из VDA; иначе код fms
-  "title": "Battery low",
-  "detail": "amr-01: state of charge 9 %",
+  "code": "ROBOT_OFFLINE",            // правило fms (8.2)
+  "title": "Robot offline",           // по-английски, показать как есть
+  "detail": "amr-01: connection CONNECTION_BROKEN",
   "robotId": "amr-01" | null,
   "missionId": null,
   "active": true,                     // причина ещё есть
   "createdAt": "...",
-  "clearedAt": null,                  // когда причина ушла
-  "acknowledgedAt": null, "acknowledgedBy": null
+  "clearedAt": null | "...",          // когда причина ушла
+  "acknowledgedAt": null | "...",     // когда подтвердили
+  "acknowledgedBy": null | "fms"      // кто: пока пользователей нет — null; "fms" — закрыла сама fms (8.2)
 }
 ```
+
+**Жизненный цикл.** Причина появилась — тревога активна. Причина ушла — тревога неактивна (`clearedAt`), сама.
+Подтверждение (`ack`) от этого не зависит: можно подтвердить активную (оператор знает, занимается) и надо
+подтвердить снятую (оператор видел, что было). Тревога **закрыта**, когда она и снята, и подтверждена.
+
+| `active` | `acknowledgedAt` | Что это | Где в UI |
+|---|---|---|---|
+| `true` | `null` | Горит, никто не видел | Alarms, сверху; в значке шапки |
+| `true` | есть | Горит, оператор знает | Alarms |
+| `false` | `null` | Прошла, никто не видел | Alarms; в значке шапки |
+| `false` | есть | Закрыта | Только история (журнал, список с фильтрами) |
+
+### 8.2. Какие тревоги поднимает fms
+
+| `code` | Поднять | Снять | `severity` |
+|---|---|---|---|
+| `ROBOT_OFFLINE` | Робот не на связи дольше 5 с (`OFFLINE`, `CONNECTION_BROKEN`, state не приходит) | Снова на связи | ERROR |
+| `EMERGENCY_STOP` | Нажата аварийная остановка | Отпущена | CRITICAL |
+| `ROBOT_ERROR` | Ошибка VDA в state робота. Одна тревога на робота и `errorType`; `title` — `Robot error: <errorType>` | Ошибка ушла из state | по уровню VDA, ниже |
+| `LOW_BATTERY` | Заряд ниже порога (как для готовности, 5.1) дольше 10 с и не заряжается | Выше порога или заряжается | WARNING |
+| `SERVICE_DOWN` | Нет связи с fleet_dispatch дольше 5 с — роботы не управляются | Связь вернулась | CRITICAL |
 
 Уровень ошибки робота VDA → `severity`:
 
@@ -712,27 +744,80 @@ GET /fms/routes?mapId=map-a1      // mapId необязателен: без не
 |---|---|
 | `WARNING` | `WARNING` |
 | `URGENT` | `ERROR` |
-| `CRITICAL` | `CRITICAL` |
-| `FATAL` | `CRITICAL` |
+| `CRITICAL`, `FATAL` | `CRITICAL` |
 
-Тревоги fms (примеры `code`):
-- `ROBOT_OFFLINE`;
-- `MISSION_FAILED`;
-- `TRAFFIC_DEADLOCK`;
-- `NO_ROUTE`;
-- `SERVICE_DOWN`.
+- **Одна активная тревога на причину:** робот с той же ошибкой — одна строка, а не новая каждую секунду.
+- **Подавление.** Робот не на связи — его остальные тревоги не поднимаются: его state устарел. Робот спит
+  (`HIBERNATING`) — тревог нет вовсе, это штатно. Пока робот не прислал ни одного state, тревоги по его
+  данным (заряд, ошибки) не поднимаются. Нет связи с dispatch — тревоги роботов замирают как есть, горит
+  одна `SERVICE_DOWN`, а не по `ROBOT_OFFLINE` на каждого.
+- **Робота удалили** — его тревоги fms снимает и подтверждает сама (`acknowledgedBy: "fms"`): действовать
+  с ними больше некому.
+- Миссия `FAILED` — не тревога, а событие журнала (`STATE FAILED` с `error`, 7.3).
+- Позже: `TRAFFIC_DEADLOCK` и другие тревоги трафика (`source: TRAFFIC`).
 
-Тревога сама становится неактивной, когда причина ушла (`clearedAt`). Подтверждение (`ack`) от этого
-не зависит.
-
-### 8.2. Пути
+### 8.3. Пути
 
 | Метод | Путь | Сервис | Тело → ответ |
 |---|---|---|---|
-| GET | `/fms/alarms?active=true&acknowledged=false&robotId=&limit=&before=` | database | → `{items: Alarm[], nextCursor}` |
-| POST | `/fms/alarms/:id/ack` | control | → `Alarm` |
+| GET | `/fms/alarms?active=&acknowledged=&robotId=&severity=&limit=&before=` | database | → `{items: Alarm[], nextCursor}` |
+| GET | `/fms/alarms/:id` | database | → `Alarm` |
+| POST | `/fms/alarms/:id/ack` | control | → 200 `Alarm` |
 
-В коде фронта модуль и путь `alerts` переименовать в `alarms`.
+- Список — новые сверху, страницы — 2.3. `active`, `acknowledged` — `true` / `false`; `severity` — через
+  запятую: `?severity=ERROR,CRITICAL`.
+- Вкладка Alarms — неподтверждённые и активные: `?acknowledged=false` и `?active=true`, объединить по `id`.
+  Значок в шапке — сколько неподтверждённых (`?acknowledged=false`), цвет — по самой серьёзной.
+- **Подтверждение:** 200 и тревога с `acknowledgedAt`. Активную, уже подтверждённую — 200 как есть (повтор
+  безопасен). Закрытую или неизвестную — 404 `NOT_FOUND`. Пока control загружает тревоги после старта —
+  503 `UNAVAILABLE`.
+
+### 8.4. Журнал
+
+```
+GET /fms/events?source=&type=&robotId=&missionId=&alarmId=&from=&to=&limit=&before=
+→ 200 { "items": [Event], "nextCursor": "4182" | null }        // database; новые сверху
+```
+
+- `source`, `type` — через запятую. `from` / `to` — время события, полуинтервал (2.3). Курсор — `id`
+  последнего события страницы, передать в `before`.
+- Неизвестный `source`, неверные `limit`, `before`, время — 400 `INVALID_INPUT`. Неизвестный `type` — просто
+  пустой список: типы будут добавляться.
+
+**`Event`** — общие поля и поля своего `type`:
+
+```jsonc
+{
+  "id": 4182,                         // число, порядок событий
+  "at": "2026-11-15T10:33:15.008Z",   // когда fms это увидел
+  "source": "ROBOT",                  // MISSION | ROBOT | ALARM | SYSTEM
+  "type": "CONNECTION",
+  "robotId": "amr-01" | null,
+  "missionId": null,
+  "alarmId": null,
+  "state": "CONNECTION_BROKEN"        // поля type — ниже
+}
+```
+
+| `source` | `type` | Поля | Когда |
+|---|---|---|---|
+| `MISSION` | `STATE`, `STEP`, `ACTION` | как в 7.3 | История миссии |
+| `ROBOT` | `CONNECTION` | `state`: `ONLINE`, `OFFLINE`, `CONNECTION_BROKEN`, `HIBERNATING`, `STALE` | Сменилась связь |
+| `ROBOT` | `AVAILABILITY` | `state`, `reasons: [{code, message}]` (5.1) | Сменилась готовность |
+| `ROBOT` | `ERROR` | `errorType`, `level`, `description`, `cleared` (`false` — появилась, `true` — ушла) | Ошибка VDA в state |
+| `ROBOT` | `POSITION` | `mapId`, `nodeId` | Оператор поставил робота на узел |
+| `ROBOT` | `PAUSED`, `RESUMED` | — | Оператор поставил на паузу, снял |
+| `ROBOT` | `REGISTERED` | `manufacturer`, `serialNumber` | Регистрация |
+| `ROBOT` | `DELETED` | `force`, `canceledMission` | Удаление принято |
+| `ALARM` | `RAISED`, `CLEARED`, `ACKED` | `code`, `severity`, `title`; `reason` (почему снята), `by` (кто подтвердил) — если есть | Жизнь тревоги |
+| `SYSTEM` | `MAP_SAVED` | `mapId`, `version`, `forced` | Карту создали или сохранили |
+| `SYSTEM` | `MAP_DELETED` | `mapId` | Карту удалили |
+
+- Журнал робота (карточка робота) — `?robotId=`, история тревоги — `?alarmId=`.
+- Событие тревоги или робота с `missionId` есть в журнале по миссии (`?missionId=`), но не в её истории
+  (7.3): там только события самой миссии.
+- Первая готовность робота после перезапуска fms события не даёт; выход на связь после перезапуска даёт:
+  журнал честно показывает, что связь восстановилась.
 
 ---
 
@@ -747,7 +832,8 @@ GET /fms/routes?mapId=map-a1      // mapId необязателен: без не
 |---|---|---|
 | Роботы | `GET /fms/robots` | 5 с |
 | Активные миссии | `GET /fms/missions?state=QUEUED,ASSIGNED,RUNNING,PAUSED,CANCELING` | 3 с |
-| Активные тревоги | `GET /fms/alarms?active=true` | 5 с |
+| Тревоги: неподтверждённые и активные (8.3) | `GET /fms/alarms?acknowledged=false`, `GET /fms/alarms?active=true` | 5 с |
+| Журнал — первая страница, пока он открыт | `GET /fms/events?...` (8.4) | 5 с |
 | Открытая карта (редактор) | `GET /fms/maps/:id` — только сравнить `version` | 10 с |
 | Маршруты, пока открыта Live Map | `GET /fms/routes?mapId=` (7.4) | 1–2 с |
 | История открытой карточки миссии, пока миссия активна | `GET /fms/missions/:id/events` (7.3) | 3 с |
