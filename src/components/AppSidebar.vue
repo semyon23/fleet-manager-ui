@@ -1,10 +1,12 @@
 <script setup>
 import { RouterLink, useRoute } from 'vue-router'
+import { useAlarmsStore } from '../stores/alarms'
 
 defineProps({ collapsed: Boolean })
 defineEmits(['toggle'])
 
 const route = useRoute()
+const alarms = useAlarmsStore()
 
 const primary = [
   { to: '/dashboard', label: 'Dashboard', icon: '□' },
@@ -12,7 +14,7 @@ const primary = [
   { to: '/maps', label: 'Maps', icon: '✎' },
   { to: '/robots', label: 'Robots', icon: '◉' },
   { to: '/missions', label: 'Missions', icon: '≡' },
-  { to: '/alarms', label: 'Alarms', icon: '!' },
+  { to: '/events', label: 'Events', icon: '!' },
 ]
 const secondary = [{ to: '/settings', label: 'Settings', icon: '⚙' }]
 
@@ -52,8 +54,17 @@ const activeClass = 'bg-brand-800 text-white'
         :class="[linkClass, isActive(item.to) ? activeClass : idleClass]"
         :title="collapsed ? item.label : undefined"
       >
-        <span class="w-5 shrink-0 text-center font-mono text-base">{{ item.icon }}</span>
+        <span class="relative w-5 shrink-0 text-center font-mono text-base">
+          {{ item.icon }}
+          <!-- Неподтверждённые тревоги — точка цвета самой серьёзной (контракт 8.3) -->
+          <span v-if="item.to === '/events' && alarms.badge && collapsed"
+                class="absolute -right-1 -top-0.5 h-2 w-2 rounded-full" :style="{ background: alarms.badge.color }" />
+        </span>
         <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
+        <span v-if="item.to === '/events' && alarms.badge && !collapsed"
+              class="ml-auto rounded px-1.5 font-mono text-[11px] text-white" :style="{ background: alarms.badge.color }">
+          {{ alarms.badge.count }}
+        </span>
       </RouterLink>
     </nav>
 

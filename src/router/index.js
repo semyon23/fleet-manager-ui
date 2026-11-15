@@ -8,8 +8,9 @@ const routes = [
   { path: '/maps/:id', name: 'map-editor', component: () => import('../views/MapEditorView.vue'), meta: { title: 'Map Editor' } },
   { path: '/robots', name: 'robots', component: () => import('../views/RobotsView.vue'), meta: { title: 'Robots' } },
   { path: '/missions', name: 'missions', component: () => import('../views/MissionsView.vue'), meta: { title: 'Missions' } },
-  { path: '/alarms', name: 'alarms', component: () => import('../views/AlarmsView.vue'), meta: { title: 'Alarms' } },
-  { path: '/alerts', redirect: '/alarms' },
+  { path: '/events', name: 'events', component: () => import('../views/EventsView.vue'), meta: { title: 'Events' } },
+  { path: '/alarms', redirect: '/events' },
+  { path: '/alerts', redirect: '/events' },
   { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue'), meta: { title: 'Settings' } },
 ]
 

@@ -6,6 +6,7 @@ import AppSidebar from './components/AppSidebar.vue'
 import AppTopbar from './components/AppTopbar.vue'
 import { useRobotsStore } from './stores/robots'
 import { useMapsStore } from './stores/maps'
+import { useAlarmsStore } from './stores/alarms'
 import { useTheme } from './composables/useTheme'
 import { useBackendHealth } from './composables/useBackendHealth'
 import { useRobotMqtt } from './composables/useRobotMqtt'
@@ -24,6 +25,8 @@ watch(wide, (w) => (collapsed.value = !w))
 onMounted(() => {
   // Глобальный опрос GET /fms/robots раз в 5 с: всё, что считает fms (статус, готовность, миссия).
   robots.startPolling()
+  // Открытые тревоги раз в 5 с: значок в шапке виден на любой странице (контракт 8.3)
+  useAlarmsStore().startPolling()
   // Список карт — один раз: меняются редко, экран Maps перечитывает его сам
   useMapsStore().load().catch((e) => console.warn('[maps] list not loaded:', e.message))
   // Health-ping /api/health каждые 3 сек — sidebar footer показывает индикатор.
@@ -35,6 +38,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   robots.stopPolling()
+  useAlarmsStore().stopPolling()
   health.stopPing()
   robotMqtt.disconnect()
 })

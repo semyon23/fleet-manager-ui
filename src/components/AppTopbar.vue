@@ -5,6 +5,7 @@ import { useBackendHealth } from '../composables/useBackendHealth'
 import { useRobotMqtt } from '../composables/useRobotMqtt'
 import { useRobotsStore } from '../stores/robots'
 import { livePositionsStatus, LEVEL_COLORS } from '../lib/livePositions'
+import { useAlarmsStore } from '../stores/alarms'
 import AppClock from './AppClock.vue'
 
 const route = useRoute()
@@ -21,6 +22,10 @@ const healthTitle = computed(() => {
 })
 
 // Живые позы роботов из MQTT: идут ли они на самом деле (пароль, топики), а не только «подключено»
+const alarms = useAlarmsStore()
+const alarmsTitle = computed(() => (alarms.badge
+  ? `${alarms.badge.count} alarm${alarms.badge.count === 1 ? '' : 's'} not acknowledged — open Events`
+  : 'No alarms waiting'))
 const mqtt = useRobotMqtt()
 const robots = useRobotsStore()
 const now = ref(Date.now())
@@ -46,6 +51,18 @@ const live = computed(() => livePositionsStatus({
       <h1 class="truncate text-lg font-semibold text-slate-900 dark:text-slate-100">{{ title }}</h1>
     </div>
     <div class="flex items-center gap-3 lg:gap-4">
+      <router-link
+        to="/events"
+        class="flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-xs"
+        :class="alarms.badge ? 'text-white' : 'text-slate-400 hover:text-brand-800 dark:hover:text-brand-300'"
+        :style="alarms.badge ? { background: alarms.badge.color } : {}"
+        :title="alarmsTitle"
+      >
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+        </svg>
+        <span v-if="alarms.badge">{{ alarms.badge.count }}</span>
+      </router-link>
       <span
         v-if="live.level !== 'off'"
         class="flex cursor-help items-center gap-1.5 font-mono text-xs text-slate-500 dark:text-slate-400"

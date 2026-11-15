@@ -1,9 +1,10 @@
 <script setup>
-import { computed, h, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRobotsStore } from '../stores/robots'
-import { NCard, NDataTable, NEmpty, NButton } from 'naive-ui'
+import { NCard, NEmpty, NButton } from 'naive-ui'
 import { RouterLink } from 'vue-router'
 import RobotIcon from '../components/RobotIcon.vue'
+import JournalList from '../components/JournalList.vue'
 import { useTheme } from '../composables/useTheme'
 import { AVAILABILITY, availabilityOf } from '../lib/availability'
 
@@ -100,14 +101,6 @@ const batteryOptions = computed(() => ({
   },
 }))
 
-// === Лента событий: пока пустая, события (тревоги, миссии) fms ещё не отдаёт ===
-const events = []
-const columns = [
-  { title: 'Time', key: 'time', render: (r) => h('span', { class: 'font-mono text-xs text-slate-500' }, r.time) },
-  { title: 'Robot', key: 'robot', render: (r) => h('span', { class: 'font-mono text-xs text-brand-800' }, r.robot) },
-  { title: 'Event', key: 'text' },
-]
-
 // Force reactivity kick после первого mount — чтоб графики нарисовались когда poll долетит.
 onMounted(() => {})
 </script>
@@ -152,10 +145,10 @@ onMounted(() => {})
     <!-- ================ Bottom: events + snapshot ================ -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <NCard title="Recent events" size="small" class="lg:col-span-2 !bg-white dark:!bg-slate-900">
-        <div v-if="!events.length" class="grid place-items-center py-6">
-          <NEmpty description="Fleet events will appear here" size="small" />
-        </div>
-        <NDataTable v-else :columns="columns" :data="events" :bordered="false" size="small" />
+        <template #header-extra>
+          <RouterLink to="/events?tab=journal" class="text-xs text-brand-800 hover:underline dark:text-brand-300">Journal →</RouterLink>
+        </template>
+        <JournalList :limit="10" :more="false" />
       </NCard>
 
       <NCard title="Fleet snapshot" size="small" class="!bg-white dark:!bg-slate-900">

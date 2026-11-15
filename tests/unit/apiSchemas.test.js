@@ -29,12 +29,14 @@ describe('API schemas — happy path', () => {
     expect(bad.success).toBe(false)
   })
 
-  it('Alert acknowledged defaults to false', () => {
-    const ok = S.Alert.parse({
-      id: 'A', severity: 'info', robotId: null, message: 'x',
-      createdAt: '2026-08-27T11:00:00Z',
-    })
-    expect(ok.acknowledged).toBe(false)
+  it('Alarm in contract format parses, unknown severity does not', () => {
+    const alarm = {
+      id: 'al-1', severity: 'ERROR', source: 'ROBOT', code: 'ROBOT_OFFLINE', title: 'Robot offline',
+      detail: 'amr-01: connection STALE', robotId: 'amr-01', missionId: null, active: true,
+      createdAt: '2026-11-15T10:33:15.008Z', clearedAt: null, acknowledgedAt: null, acknowledgedBy: null,
+    }
+    expect(S.Alarm.safeParse(alarm).success).toBe(true)
+    expect(S.Alarm.safeParse({ ...alarm, severity: 'LOUD' }).success).toBe(false)
   })
 
   it('Waypoint action blockingType must be enum', () => {

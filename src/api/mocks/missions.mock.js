@@ -1,5 +1,6 @@
 import { ApiError } from '../client'
 import * as maps from './maps.mock'
+import { addEvent as addJournalEvent } from './events.mock'
 
 /**
  * Мок миссий в формате контракта v2 (раздел 7). Стартуем с пустого списка. Миссии в моке не едут:
@@ -19,8 +20,10 @@ function find(id) {
   return mission
 }
 
+// История миссии (7.3) и тот же журнал (8.4), source MISSION
 function addEvent(mission, fields) {
   MOCK_EVENTS.push({ id: ++eventId, missionId: mission.id, at: mission.updatedAt, robotId: mission.robotId, ...fields })
+  addJournalEvent({ source: 'MISSION', missionId: mission.id, robotId: mission.robotId, ...fields })
 }
 
 export function listMissions({ state, robotId, mapId, from, to, limit = 50, before } = {}) {

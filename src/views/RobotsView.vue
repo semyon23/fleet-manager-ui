@@ -10,6 +10,7 @@ import { AVAILABILITY_OPTIONS, availabilityOf } from '../lib/availability'
 import * as api from '../api'
 import { subscribeRobot, unsubscribeRobot } from '../composables/useRobotMqtt'
 import PlaceRobotDialog from '../components/PlaceRobotDialog.vue'
+import JournalList from '../components/JournalList.vue'
 import { useRiskyAction } from '../composables/useRiskyAction'
 
 const store = useRobotsStore()
@@ -408,6 +409,11 @@ async function submitRegister() {
               </template>
               Delete robot "{{ selectedRobot.id }}" from the fleet?
             </NPopconfirm>
+          </div>
+
+          <div>
+            <div class="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">Journal</div>
+            <JournalList :robot-id="selectedRobot.id" :limit="20" />
           </div>
         </div>
         <div v-else class="text-sm text-slate-500">No robot selected.</div>

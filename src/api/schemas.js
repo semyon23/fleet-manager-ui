@@ -317,17 +317,37 @@ export const RobotRoute = z.object({
 })
 export const RobotRouteList = z.object({ items: z.array(RobotRoute) })
 
-// === Alerts ===
-export const Alert = z.object({
+// === Тревоги и журнал (контракт 8) ===
+export const SEVERITY_VALUES = ['INFO', 'WARNING', 'ERROR', 'CRITICAL']
+
+export const Alarm = z.object({
   id: z.string(),
-  severity: z.enum(['info', 'warning', 'error']),
+  severity: z.enum(SEVERITY_VALUES),
+  source: z.string(),
+  code: z.string(),
+  title: z.string(),
+  detail: z.string(),
   robotId: z.string().nullable(),
-  message: z.string(),
-  code: z.string().optional(),
+  missionId: z.string().nullable(),
+  active: z.boolean(),
   createdAt: IsoDateTime,
-  acknowledged: z.boolean().default(false),
-})
-export const AlertList = z.array(Alert)
+  clearedAt: IsoDateTime.nullable(),
+  acknowledgedAt: IsoDateTime.nullable(),
+  acknowledgedBy: z.string().nullable(),
+}).passthrough()
+export const AlarmPage = z.object({ items: z.array(Alarm), nextCursor: z.string().nullable() })
+
+// Событие журнала (8.4): общие поля + поля своего type
+export const JournalEvent = z.object({
+  id: z.number(),
+  at: IsoDateTime,
+  source: z.enum(['MISSION', 'ROBOT', 'ALARM', 'SYSTEM']),
+  type: z.string(),
+  robotId: z.string().nullable(),
+  missionId: z.string().nullable(),
+  alarmId: z.string().nullable(),
+}).passthrough()
+export const EventPage = z.object({ items: z.array(JournalEvent), nextCursor: z.string().nullable() })
 
 // === Settings ===
 export const AppSettings = z.object({
