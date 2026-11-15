@@ -438,6 +438,15 @@ function makeEdge(fromId, toId) {
   }
 }
 
+// Рёбра a → b (и b → a при Double Way), кроме уже существующих. id ребра — «откуда_куда»: та же пара узлов
+// второй раз дала бы второе ребро с тем же id, и fms отклонил бы карту (duplicate edge id)
+function newEdgesBetween(a, b) {
+  const existing = new Set(map.value.edges.map((e) => e.id))
+  const added = [makeEdge(a, b)]
+  if (doubleWay.value) added.push(makeEdge(b, a))
+  return added.filter((e) => !existing.has(e.id))
+}
+
 function onNodeClick({ node, event }) {
   if (isPathTool(tool.value)) {
     const p = layouts.nodes[node]
@@ -455,20 +464,18 @@ function onNodeClick({ node, event }) {
       pendingEdgeStart = node
       msg.info('Edge from ' + node + ' — click target')
     } else if (pendingEdgeStart !== node) {
-      const eNew = makeEdge(pendingEdgeStart, node)
-      const added = [eNew]
-      if (doubleWay.value) added.push(makeEdge(node, pendingEdgeStart))
+      const added = newEdgesBetween(pendingEdgeStart, node)
+      pendingEdgeStart = null
+      if (!added.length) return msg.info('These nodes are already connected')
       store.update(map.value.id, { edges: [...map.value.edges, ...added] })
       for (const e of added) addEdgeToGraph(e)
-      pendingEdgeStart = null
       pushHistory()
     }
     return
   }
   if ((tool.value === 'node' || tool.value === 'batch-lines') && shouldAutoConnect() && selectedNodes.value.length === 1 && selectedNodes.value[0] !== node) {
-    const eNew = makeEdge(selectedNodes.value[0], node)
-    const added = [eNew]
-    if (doubleWay.value) added.push(makeEdge(node, selectedNodes.value[0]))
+    const added = newEdgesBetween(selectedNodes.value[0], node)
+    if (!added.length) return
     store.update(map.value.id, { edges: [...map.value.edges, ...added] })
     for (const e of added) addEdgeToGraph(e)
     pushHistory()

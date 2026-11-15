@@ -1,7 +1,7 @@
 <script setup>
 import { useRobotsStore } from '../stores/robots'
 import { useMapsStore } from '../stores/maps'
-import { NCard, NTag, NSelect, NSwitch, NButton } from 'naive-ui'
+import { NCard, NTag, NSelect, NButton, NPopover, NCheckbox } from 'naive-ui'
 import { ref, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
 import { robotLook, footprintPx } from '../lib/robotLook'
 import { releasedPoints, plannedPoints, goalPoints, toPolyline } from '../lib/robotRoutes'
@@ -48,8 +48,30 @@ const selectedId = ref(null)
 const selected = computed(() => markers.value.find((m) => m.id === selectedId.value) || null)
 const hovered = ref(null)
 
-// Робот — в реальном масштабе карты (метры / разрешение), растёт вместе с zoom
-const robotSize = computed(() => footprintPx(activeMap.value?.meta?.resolution))
+// Размер окна карты на экране — следим, чтобы знать, сколько экранных пикселей в пикселе карты
+const svgBox = ref({ w: 0, h: 0 })
+let resizeObserver = null
+onMounted(() => {
+  resizeObserver = new ResizeObserver(([entry]) => {
+    svgBox.value = { w: entry.contentRect.width, h: entry.contentRect.height }
+  })
+  if (!svgRef.value) return
+  const rect = svgRef.value.getBoundingClientRect()   // сразу, не дожидаясь первого события
+  svgBox.value = { w: rect.width, h: rect.height }
+  resizeObserver.observe(svgRef.value)
+})
+onBeforeUnmount(() => resizeObserver?.disconnect())
+// Пикселей карты в одном экранном пикселе (SVG вписан в окно, preserveAspectRatio meet, и ещё zoom) —
+// для того, что на экране должно быть одного размера при любом zoom: робот, подписи
+const perScreenPx = computed(() => {
+  const fit = Math.min(svgBox.value.w / viewSize.value.w, svgBox.value.h / viewSize.value.h) || 1
+  return 1 / (zoom.value * fit)
+})
+
+// Робот — в реальном масштабе карты, но на экране не меньше 22 px: при отдалении не пропадает в точку
+const ROBOT_MIN_SCREEN_PX = 22
+const robotSize = computed(() =>
+  footprintPx(activeMap.value?.meta?.resolution, ROBOT_MIN_SCREEN_PX * perScreenPx.value))
 
 const filteredRobots = computed(() =>
   activeMap.value ? robots.robots.filter((r) => r.mapId === activeMap.value.id) : [],
@@ -57,9 +79,28 @@ const filteredRobots = computed(() =>
 const elsewhereCount = computed(() => robots.robots.filter((r) => r.mapId !== selectedMapId.value).length)
 const showPlace = ref(false)
 
-const showRoutes = ref(true)
-const showZones = ref(true)
-const showRobotRoutes = ref(true)
+// === Слои карты: что показывать — выбирает оператор, запоминаем в этом браузере ===
+const LAYERS = [
+  { key: 'zones', label: 'Zones' },
+  { key: 'roads', label: 'Roads' },
+  { key: 'nodeLabels', label: 'Node names' },
+  { key: 'stations', label: 'Stations' },
+  { key: 'routes', label: 'Routes from fms (released)' },
+  { key: 'planned', label: 'Planned by traffic (waiting for release)' },
+  { key: 'goals', label: 'Mission goals' },
+  { key: 'robotLabels', label: 'Robot names' },
+  { key: 'robotPath', label: 'Path planned by the robot', hint: 'From the robot itself (VDA visualization), if it shares it' },
+]
+const LAYERS_KEY = 'fm.liveMap.layers'
+function loadLayers() {
+  const all = Object.fromEntries(LAYERS.map((l) => [l.key, !l.disabled]))
+  try { return { ...all, ...JSON.parse(localStorage.getItem(LAYERS_KEY) || '{}') } } catch { return all }
+}
+const layers = ref(loadLayers())
+watch(layers, (v) => { try { localStorage.setItem(LAYERS_KEY, JSON.stringify(v)) } catch { /* приватный режим */ } }, { deep: true })
+const showRoutes = computed(() => layers.value.roads)
+const showZones = computed(() => layers.value.zones)
+const showRobotRoutes = computed(() => layers.value.routes || layers.value.planned || layers.value.goals)
 
 // === Маршруты роботов (контракт 7.4): опрос, пока страница открыта и вкладка видна (9.1) ===
 const ROUTES_POLL_MS = 1500
@@ -144,7 +185,7 @@ function onMouseUp() { isDragging.value = false; dragStart = null }
 function onMouseLeave() { isDragging.value = false; dragStart = null }
 
 const stations = computed(() => {
-  if (!activeMap.value?.stations?.length) return []
+  if (!layers.value.stations || !activeMap.value?.stations?.length) return []
   return activeMap.value.stations.map((st) => {
     const meta = stationKindMeta(st.kind)
     return {
@@ -235,6 +276,22 @@ const nodePositions = computed(() => {
 })
 const position = (id) => nodePositions.value.get(id) || null
 
+// Путь, который робот рассчитал сам (VDA visualization): метры карты → пиксели картинки
+const robotPaths = computed(() => {
+  if (!layers.value.robotPath || !activeMap.value) return []
+  const toPx = ({ x, y }) => {
+    const { u, v } = worldToPixel(activeMap.value.meta, x, y, activeMap.value.height)
+    return { x: PADDING + u, y: PADDING + v }
+  }
+  return markers.value
+    .filter((m) => m.path && (m.path.planned.length > 1 || m.path.intermediate.length > 1))
+    .map((m) => ({
+      id: m.id,
+      planned: toPolyline(m.path.planned.map(toPx)),
+      intermediate: toPolyline(m.path.intermediate.map(toPx)),
+    }))
+})
+
 // Линии маршрутов: выбранный робот — толстая линия поверх остальных, остальные — тонкие
 const routeLines = computed(() => {
   if (!showRobotRoutes.value) return []
@@ -277,18 +334,18 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
         </div>
       </template>
       <template #header-extra>
-        <label class="mr-4 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          Show zones
-          <NSwitch v-model:value="showZones" size="small" />
-        </label>
-        <label class="mr-4 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          Show roads
-          <NSwitch v-model:value="showRoutes" size="small" />
-        </label>
-        <label class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          Robot routes
-          <NSwitch v-model:value="showRobotRoutes" size="small" />
-        </label>
+        <NPopover trigger="click" placement="bottom-end">
+          <template #trigger>
+            <NButton size="small" tertiary>Layers ▾</NButton>
+          </template>
+          <div class="flex flex-col gap-1.5 py-1">
+            <NCheckbox v-for="l in LAYERS" :key="l.key" v-model:checked="layers[l.key]" :disabled="l.disabled"
+                       :title="l.hint">
+              <span class="text-sm">{{ l.label }}</span>
+              <span v-if="l.hint" class="block text-[11px] text-slate-400">{{ l.hint }}</span>
+            </NCheckbox>
+          </div>
+        </NPopover>
       </template>
 
       <div
@@ -364,7 +421,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
           <g v-if="showRoutes">
             <g v-for="wp in waypoints" :key="wp.id" :transform="`translate(${wp.x} ${wp.y})`">
               <circle r="1.8" stroke-width="0.8" class="fill-white stroke-slate-500 dark:fill-slate-800 dark:stroke-slate-300" />
-              <text y="-6" text-anchor="middle" font-size="5" font-family="JetBrains Mono, monospace"
+              <text v-if="layers.nodeLabels" y="-6" text-anchor="middle" font-size="5" font-family="JetBrains Mono, monospace"
                     class="fill-slate-600 dark:fill-slate-300" opacity="0.6">{{ wp.name }}</text>
             </g>
           </g>
@@ -388,14 +445,22 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
           <!-- Маршруты роботов: сплошная — разрешено ехать, пунктир — запланировано, ромбы — цели шагов -->
           <g v-for="r in routeLines" :key="'route-' + r.id" fill="none" stroke-linecap="round" stroke-linejoin="round"
              pointer-events="none" :opacity="r.selected || !selectedId ? 0.9 : 0.45">
-            <polyline v-if="r.released" :points="r.released" :stroke="r.color"
+            <polyline v-if="layers.routes && r.released" :points="r.released" :stroke="r.color"
                       :stroke-width="r.selected ? robotSize.width * 0.35 : 1.5" />
-            <polyline v-if="r.planned" :points="r.planned" :stroke="r.color"
+            <polyline v-if="layers.planned && r.planned" :points="r.planned" :stroke="r.color"
                       :stroke-width="r.selected ? robotSize.width * 0.2 : 1" stroke-dasharray="4 3" />
-            <rect v-for="goal in r.goals" :key="goal.id"
+            <rect v-for="goal in (layers.goals ? r.goals : [])" :key="goal.id"
                   :x="goal.x - 4" :y="goal.y - 4" width="8" height="8"
                   :transform="`rotate(45 ${goal.x} ${goal.y})`"
                   :stroke="r.color" :stroke-width="r.selected ? 1.8 : 1" class="fill-white dark:fill-slate-900" />
+          </g>
+
+          <!-- Путь робота: длинный (plannedPath) — пунктир, ближний (intermediatePath) — сплошная -->
+          <g v-for="p in robotPaths" :key="'path-' + p.id" fill="none" stroke="#0f766e" stroke-linecap="round"
+             stroke-linejoin="round" pointer-events="none">
+            <polyline v-if="p.planned" :points="p.planned" :stroke-width="2 * perScreenPx"
+                      :stroke-dasharray="`${6 * perScreenPx} ${4 * perScreenPx}`" opacity="0.8" />
+            <polyline v-if="p.intermediate" :points="p.intermediate" :stroke-width="3.5 * perScreenPx" opacity="0.9" />
           </g>
 
           <g
@@ -416,17 +481,14 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
               :rotate="m.rotateDeg"
               :selected="m.id === selectedId || hovered?.id === m.id"
             />
-            <text
-              :y="robotSize.length * 0.75 + 7"
-              text-anchor="middle"
-              font-size="7"
-              font-family="JetBrains Mono, monospace"
-              fill="#0f172a"
-              font-weight="500"
-              class="dark:fill-slate-100"
-            >
-              {{ m.id }}
-            </text>
+            <!-- Имя — на подложке и одного размера на экране при любом zoom -->
+            <g v-if="layers.robotLabels" :transform="`translate(0 ${robotSize.length * 0.7 + 9 * perScreenPx})`">
+              <rect :x="-(m.id.length * 3.6 + 5) * perScreenPx" :y="-7 * perScreenPx"
+                    :width="(m.id.length * 7.2 + 10) * perScreenPx" :height="14 * perScreenPx" :rx="3 * perScreenPx"
+                    fill="#1e293b" fill-opacity="0.85" />
+              <text y="0" text-anchor="middle" dominant-baseline="central" :font-size="11 * perScreenPx"
+                    font-family="JetBrains Mono, monospace" fill="#ffffff">{{ m.id }}</text>
+            </g>
           </g>
 
           <g v-if="hovered" pointer-events="none">

@@ -106,6 +106,7 @@ export const useRobotsStore = defineStore('robots', () => {
       y: patch.y ?? cur.y,
       theta: patch.theta ?? cur.theta,
       mapId: patch.mapId ?? cur.mapId,
+      path: patch.path ?? cur.path,
       connection: patch.connection ?? cur.connection,
       availability: patch.availability ?? cur.availability,
     }
@@ -118,7 +119,7 @@ export const useRobotsStore = defineStore('robots', () => {
     robots.value = freshList.map((r) => {
       const cur = previous.get(r.id)
       if (!cur || !(now - (poseAt.get(r.id) || 0) < POSE_FRESH_MS)) return { ...r }
-      return { ...r, x: cur.x, y: cur.y, theta: cur.theta, mapId: cur.mapId }
+      return { ...r, x: cur.x, y: cur.y, theta: cur.theta, mapId: cur.mapId, path: cur.path }
     })
   }
 

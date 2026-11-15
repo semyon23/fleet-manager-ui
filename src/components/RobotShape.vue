@@ -1,61 +1,50 @@
 <script setup>
-// Робот, вид сверху, центр в (0, 0), нос — по +x до поворота. Рисуется внутри чужого <svg>:
-// на Live Map (размер в пикселях карты) и в RobotIcon (таблицы, карточки).
+// Робот, вид сверху, центр в (0, 0), нос — по +x до поворота. Тот же AMR с дифференциальным приводом,
+// что на заставке (public/splash/robot.svg): корпус, два ведущих колеса по бокам, опорные колёса по углам,
+// лидар спереди. Корпус у всех один; состояние — цветная полоса на корме.
+// Рисуется внутри чужого <svg>: на Live Map (размер в пикселях карты) и в RobotIcon (таблицы, карточки).
 import { computed } from 'vue'
 
 const props = defineProps({
-  length: { type: Number, required: true },   // вдоль хода
-  width: { type: Number, required: true },
-  look: { type: Object, required: true },     // robotLook(robot)
+  length: { type: Number, required: true },   // вдоль хода; рисунок масштабируется по длине
+  width: { type: Number, default: 0 },        // не нужен: пропорции — как у робота с заставки
+  look: { type: Object, required: true },     // robotLook(robot): color — цвет полосы состояния
   rotate: { type: Number, default: 0 },       // градусы SVG
   selected: { type: Boolean, default: false },
 })
 
-const g = computed(() => {
-  const l = props.length
-  const w = props.width
-  const stroke = Math.max(0.6, w * 0.07)
-  return {
-    l, w, stroke,
-    x: -l / 2, y: -w / 2,
-    radius: w * 0.14,
-    bumper: Math.max(1, l * 0.08),
-    bumperX: l / 2 - Math.max(1, l * 0.08) / 2 - stroke / 2,
-    chevron: `${-l * 0.08},${-w * 0.24} ${l * 0.1},0 ${-l * 0.08},${w * 0.24}`,
-    bar: { w: l * 0.07, h: w * 0.42, gap: l * 0.08 },
-    pad: Math.max(1.5, w * 0.18),
-    badge: Math.max(2.5, w * 0.22),
-    reach: Math.hypot(l, w) / 2,
-  }
-})
+// Рисунок заставки: корпус 68 x 44, с колёсами 68 x 58 единиц
+const DRAWING_LENGTH = 68
+const scale = computed(() => props.length / DRAWING_LENGTH)
 </script>
 
 <template>
   <g>
-    <rect v-if="selected"
-          :x="g.x - g.pad" :y="g.y - g.pad" :width="g.l + 2 * g.pad" :height="g.w + 2 * g.pad"
-          :transform="`rotate(${rotate})`" :rx="g.radius + g.pad"
-          fill="none" :stroke="look.color" :stroke-width="g.stroke * 0.8" :stroke-dasharray="`${g.stroke * 2} ${g.stroke * 2}`" />
-    <g :transform="`rotate(${rotate})`">
-      <rect :x="g.x" :y="g.y" :width="g.l" :height="g.w" :rx="g.radius"
-            :fill="look.color" fill-opacity="0.22" :stroke="look.color" :stroke-width="g.stroke"
-            :stroke-dasharray="look.dashed ? `${g.stroke * 2.5} ${g.stroke * 2}` : null" />
-      <template v-if="!look.dashed">
-        <line :x1="g.bumperX" :y1="g.y + g.w * 0.14" :x2="g.bumperX" :y2="-g.y - g.w * 0.14"
-              :stroke="look.color" :stroke-width="g.bumper" stroke-linecap="round" />
-      </template>
-      <g v-if="look.mark === 'pause'" :fill="look.color">
-        <rect :x="-g.bar.gap / 2 - g.bar.w" :y="-g.bar.h / 2" :width="g.bar.w" :height="g.bar.h" />
-        <rect :x="g.bar.gap / 2" :y="-g.bar.h / 2" :width="g.bar.w" :height="g.bar.h" />
+    <circle v-if="selected" :r="40 * scale" fill="#3b82f6" fill-opacity="0.12" stroke="#3b82f6" :stroke-width="3 * scale" />
+    <g :transform="`rotate(${rotate}) scale(${scale})`">
+      <!-- Ведущие колёса: светлый обод и протектор — читаются и на тёмном фоне -->
+      <g fill="#334155" stroke="#cbd5e1" stroke-width="1.5">
+        <rect x="-11" y="-29" width="22" height="9" rx="3" />
+        <rect x="-11" y="20" width="22" height="9" rx="3" />
       </g>
-      <polyline v-else :points="g.chevron" fill="none" :stroke="look.color" :stroke-width="g.stroke * 1.2"
-                stroke-linecap="round" stroke-linejoin="round" />
-    </g>
-    <!-- Значок ошибки не поворачивается вместе с роботом: «!» всегда читается -->
-    <g v-if="look.mark === 'error'" :transform="`translate(${g.reach * 0.7} ${-g.reach * 0.7})`">
-      <circle :r="g.badge" fill="#ef4444" stroke="#ffffff" :stroke-width="g.stroke * 0.6" />
-      <text y="0" text-anchor="middle" dominant-baseline="central" :font-size="g.badge * 1.4"
-            font-weight="700" font-family="system-ui, sans-serif" fill="#ffffff">!</text>
+      <g stroke="#94a3b8" stroke-width="1.2" stroke-linecap="round">
+        <path d="M-6 -27V-22M0 -27V-22M6 -27V-22" />
+        <path d="M-6 22V27M0 22V27M6 22V27" />
+      </g>
+      <rect x="-34" y="-22" width="68" height="44" rx="10" fill="#e2e8f0" stroke="#0f766e" stroke-width="3" />
+      <!-- Опорные колёса по углам -->
+      <g fill="#94a3b8" stroke="#64748b" stroke-width="1">
+        <circle cx="-27" cy="-15" r="3" />
+        <circle cx="-27" cy="15" r="3" />
+        <circle cx="27" cy="-15" r="3" />
+        <circle cx="27" cy="15" r="3" />
+      </g>
+      <!-- Полоса состояния на корме -->
+      <rect x="-31" y="-19" width="8" height="38" rx="2" :fill="look.color" />
+      <rect x="-20" y="-8" width="26" height="16" rx="3" fill="#cbd5e1" />
+      <!-- Лидар — нос робота -->
+      <circle cx="20" cy="0" r="7" fill="#2d3748" />
+      <circle cx="20" cy="0" r="3" fill="#4fd1c5" />
     </g>
   </g>
 </template>

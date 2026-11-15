@@ -47,6 +47,8 @@ const BASE = import.meta.env.BASE_URL
 const SAMPLES = [
   { name: 'Warehouse 25×20 m', pgm: `${BASE}samples/warehouse.pgm`, yaml: `${BASE}samples/warehouse.yaml`, key: 'warehouse' },
   { name: 'Workshop 10×10 m', pgm: `${BASE}samples/workshop.pgm`, yaml: `${BASE}samples/workshop.yaml`, key: 'workshop' },
+  // Как карта от slam_toolbox: стены, стеллажи, колонны, доки, офис, зарядки; места на 10 роботов
+  { name: 'Warehouse 60×40 m (10 robots)', pgm: `${BASE}samples/warehouse-large.pgm`, yaml: `${BASE}samples/warehouse-large.yaml`, key: 'warehouse-large' },
 ]
 
 async function loadSample(sample) {

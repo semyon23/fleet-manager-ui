@@ -2,6 +2,7 @@ import { ref, readonly } from 'vue'
 import mqtt from 'mqtt'
 import { getMockMode } from '../api/client'
 import { useRobotsStore } from '../stores/robots'
+import { robotPathOf } from '../lib/robotPath'
 
 /**
  * MQTT over WebSocket: живая поза и связь роботов напрямую от брокера (контракт v2, раздел 10).
@@ -78,6 +79,7 @@ function handleMessage(topic, payload) {
       y: Number(p.y) || 0,
       theta: Number(p.theta) || 0,
       mapId: p.mapId,
+      path: robotPathOf(msg),   // путь, который робот рассчитал сам (VDA 6.7: plannedPath, intermediatePath)
     })
   } else if (parts[4] === 'connection') {
     // Не ONLINE → сразу offline, не дожидаясь опроса. Обратно в online — только по данным fms (опрос).
