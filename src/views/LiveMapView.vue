@@ -15,6 +15,7 @@ import { worldAngleToSvgDeg } from '../lib/geometry'
 import { formatEventTime } from '../lib/journal'
 import PlaceRobotDialog from '../components/PlaceRobotDialog.vue'
 import MapRobotShape from '../components/MapRobotShape.vue'
+import LiveRobotList from '../components/LiveRobotList.vue'
 import FleetStatusTag from '../components/FleetStatusTag.vue'
 
 const robots = useRobotsStore()
@@ -357,6 +358,7 @@ const markers = computed(() =>
   filteredRobots.value.map((r) => {
     const { u, v } = worldToPixel(activeMap.value.meta, r.x, r.y, activeMap.value.height)
     const look = robotLook(r)
+    const missionLabel = r.mission?.length > 15 ? `${r.mission.slice(0, 6)}…${r.mission.slice(-7)}` : r.mission
     return {
       ...r,
       px: PADDING + u,
@@ -364,6 +366,7 @@ const markers = computed(() =>
       stroke: look.color,
       stateLabel: look.label,
       labelWidth: 22 + r.id.length * 6.7, // точка состояния, моноширинный ID и поля в экранных пикселях
+      missionLabel,
       rotateDeg: worldAngleToSvgDeg(r.theta),
       route: routeByRobot.value.get(r.id) || null,
     }
@@ -608,7 +611,16 @@ const tooltipTransform = computed(() => {
               :rotate="m.rotateDeg"
               :selected="m.id === selectedId"
               :detailed="detailedRobots"
+              :loaded="m.loads.length > 0"
             />
+            <g v-if="layers.robotLabels && m.mission && (m.id === selectedId || detailedRobots)"
+               :transform="`translate(${robotSize.length * 0.45} ${-robotSize.length * 0.48}) scale(${perScreenPx})`"
+               pointer-events="none" class="robot-mission">
+              <title>Mission {{ m.mission }}</title>
+              <rect x="0" y="-14" :width="10 + m.missionLabel.length * 6.7" height="16" rx="3"
+                    fill="var(--ui-surface)" stroke="var(--ui-border)" />
+              <text x="5" y="-3" fill="var(--ui-text)" font-size="11" font-family="ui-monospace, monospace">{{ m.missionLabel }}</text>
+            </g>
             <!-- Имя — на подложке и одного размера на экране при любом zoom -->
             <g v-if="layers.robotLabels"
                :transform="`translate(0 ${robotSize.length * 0.75 + 10 * perScreenPx}) scale(${perScreenPx})`">
@@ -677,10 +689,11 @@ const tooltipTransform = computed(() => {
           <span v-else-if="selectedMapId">Loading the map…</span>
           <span v-else-if="!selectedId">No maps in fms</span>
         </div>
-        <div role="status" class="pointer-events-none absolute left-3 right-14 top-3">
-          <span v-if="routeNotice" class="inline-block rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+        <div class="pointer-events-none absolute left-3 right-14 top-3 flex flex-col items-start gap-2">
+          <div v-if="routeNotice" role="status" class="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
             {{ routeNotice }}
-          </span>
+          </div>
+          <LiveRobotList :robots="robots.robots" :selected-id="selectedId" @select="selectRobot" />
         </div>
         <div class="absolute right-3 top-3 flex flex-col overflow-hidden rounded border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <button
@@ -733,7 +746,8 @@ const tooltipTransform = computed(() => {
       <div v-else class="flex flex-col gap-3 text-sm">
         <div v-if="hasPosition(selected)" class="grid place-items-center rounded bg-slate-100 py-3 dark:bg-slate-800">
           <svg width="96" height="96" viewBox="-42 -42 84 84" role="img" :aria-label="`${selected.id} · ${selectedLook.label}`">
-            <MapRobotShape :length="62" :color="selectedLook.color" :rotate="worldAngleToSvgDeg(selected.theta)" detailed />
+            <MapRobotShape :length="62" :color="selectedLook.color" :rotate="worldAngleToSvgDeg(selected.theta)"
+                           :loaded="selected.loads.length > 0" detailed />
           </svg>
         </div>
         <div class="flex justify-between"><span class="text-(color:--ui-muted)">Model</span><span class="font-mono">{{ selected.model }}</span></div>
@@ -757,6 +771,17 @@ const tooltipTransform = computed(() => {
         </div>
         <div class="flex justify-between"><span class="text-(color:--ui-muted)">Map</span><span class="font-mono text-xs">{{ selected.mapId || '-' }}</span></div>
         <div class="flex justify-between"><span class="text-(color:--ui-muted)">Last node</span><span class="font-mono text-xs">{{ selected.lastNodeId || '-' }}</span></div>
+        <div class="flex flex-wrap justify-between gap-2">
+          <span class="text-(color:--ui-muted)">{{ lastReported ? 'Last reported load' : 'Load' }}</span>
+          <ul v-if="selected.loads.length" class="min-w-0 space-y-1 text-right text-xs">
+            <li v-for="(load, index) in selected.loads" :key="index" class="break-all">
+              <div v-if="load.loadId">ID · {{ load.loadId }}</div>
+              <div v-if="load.loadType">Type · {{ load.loadType }}</div>
+              <span v-if="!load.loadId && !load.loadType">Load reported</span>
+            </li>
+          </ul>
+          <span v-else class="text-xs">No load reported</span>
+        </div>
         <div class="flex flex-wrap justify-between gap-2">
           <span class="text-(color:--ui-muted)">{{ lastReported ? 'Last reported mission' : 'Current mission' }}</span>
           <span class="font-mono text-xs">{{ selected.mission || '—' }}</span>

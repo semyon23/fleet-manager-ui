@@ -244,6 +244,7 @@ export function toViewRobot(r) {
     operatingMode: s?.operatingMode ?? null,
     lastStateAt: s?.lastStateAt ?? null,
     errors: s?.errors ?? [],
+    loads: s?.loads ?? [],
     mission: s?.missionId ?? null,
   }
 }

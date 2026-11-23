@@ -22,7 +22,7 @@ function robot(id, state, x, theta) {
   }
 }
 
-async function openLiveMap(page) {
+async function openLiveMap(page, fleet = [robot('AMR-07', 'IDLE', 4, Math.PI / 2), robot('AMR-12', 'CHARGING', 16, 0)]) {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.route('**/config.js', route => route.fulfill({
     contentType: 'application/javascript',
@@ -32,7 +32,7 @@ async function openLiveMap(page) {
     '/api/health': { status: 'OK' },
     '/api/fms/maps': [map],
     '/api/fms/maps/workshop': { ...map, pgmDataUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="160"%3E%3Crect width="200" height="160" fill="gray"/%3E%3C/svg%3E' },
-    '/api/fms/robots': [robot('AMR-07', 'IDLE', 4, Math.PI / 2), robot('AMR-12', 'CHARGING', 16, 0)],
+    '/api/fms/robots': fleet,
     '/api/fms/routes': { items: [] },
     '/api/fms/alarms': { items: [], nextCursor: null },
   }
@@ -97,6 +97,51 @@ test('Live Map selects an oriented chassis independently of hover and robot name
   await expect(charging).toBeVisible()
   await names.click()
   await expect(name).toBeVisible()
+})
+
+test('Live Map shows reported loads independently of missions and updates the selected portrait', async ({ page }) => {
+  const loaded = robot('AMR-07', 'OFFLINE', 4, 0)
+  Object.assign(loaded.status, { connection: 'OFFLINE', loads: [{ loadId: '', loadType: '' }] })
+  const busy = robot('AMR-12', 'BUSY', 16, 0)
+  Object.assign(busy.status, { missionId: 'M-102', loads: [] })
+  await openLiveMap(page, [loaded, busy])
+
+  const offline = page.getByRole('button', { name: 'AMR-07 · Offline', exact: true })
+  const onMission = page.getByRole('button', { name: 'AMR-12 · Busy', exact: true })
+  const details = page.locator('#live-map-robot-details')
+  await expect(offline.locator('.robot-load')).toBeVisible()
+  await expect(onMission.locator('.robot-load')).toHaveCount(0)
+  const roster = page.getByRole('button', { name: 'Robots (2)', exact: true })
+  await roster.click()
+  const search = page.getByRole('searchbox', { name: 'Search robots by ID' })
+  await search.fill('amr-07')
+  const results = page.getByRole('list', { name: 'Fleet robots' })
+  await expect(results.getByRole('button')).toHaveCount(1)
+  await results.getByRole('button').click()
+  await expect(offline).toHaveAttribute('aria-pressed', 'true')
+  await search.press('Escape')
+  await expect(roster).toHaveAttribute('aria-expanded', 'false')
+  await expect(details.locator('.robot-load')).toBeVisible()
+  await expect(details.getByText('Last reported load', { exact: true })).toBeVisible()
+  await expect(details.getByText('Load reported', { exact: true })).toBeVisible()
+
+  await onMission.press('Enter')
+  await expect(onMission.locator('.robot-mission text')).toHaveText('M-102')
+  await expect(details.getByText('No load reported')).toBeVisible()
+  await page.getByRole('button', { name: /^Layers/ }).click()
+  await page.getByRole('checkbox', { name: 'Robot names' }).click()
+  await expect(page.locator('.robot-mission')).toHaveCount(0)
+  await expect(offline.locator('.robot-load')).toBeVisible()
+
+  busy.status.loads = [{ loadId: 'PAL-41', loadType: 'EUR' }, { loadId: 'BOX-12', loadType: '' }]
+  await expect(onMission.locator('.robot-load')).toBeVisible()
+  await expect(details.locator('.robot-load')).toBeVisible()
+  await expect(details.getByText('ID · PAL-41')).toBeVisible()
+  await expect(details.getByText('Type · EUR')).toBeVisible()
+  await expect(details.getByText('ID · BOX-12')).toBeVisible()
+  busy.status.loads = []
+  await expect(onMission.locator('.robot-load')).toHaveCount(0)
+  await expect(details.locator('.robot-load')).toHaveCount(0)
 })
 
 test('Live Map covers the viewport with its grid and follows a moving robot', async ({ page }) => {

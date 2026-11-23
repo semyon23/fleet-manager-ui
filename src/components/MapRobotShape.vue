@@ -5,6 +5,7 @@ defineProps({
   rotate: { type: Number, required: true },
   selected: Boolean,
   detailed: Boolean,
+  loaded: Boolean,
 })
 
 // Нос смотрит по +X. Длина корпуса в координатах рисунка — от −31 до +31.
@@ -15,23 +16,20 @@ const BODY_LENGTH = 62
   <g :transform="`rotate(${rotate}) scale(${length / BODY_LENGTH})`">
     <path v-if="selected" d="M-37-17v-10h10M27-27h10v10M37 17v10H27M-27 27h-10V17"
           fill="none" class="selection-corners stroke-[#173f52] dark:stroke-[#d5f2ff]" stroke-width="2.8" stroke-linecap="round" />
-    <g fill="#28343d" stroke="#deeaeb" stroke-width="1.6">
-      <rect x="-15" y="-25" width="25" height="9" rx="3" />
-      <rect x="-15" y="16" width="25" height="9" rx="3" />
+    <g fill="#1c252d" stroke="#d3dade" stroke-width="1.4">
+      <rect x="-10" y="-23" width="20" height="7" rx="2" />
+      <rect x="-10" y="16" width="20" height="7" rx="2" />
     </g>
-    <path d="M-31-16Q-31-20-26-20H19L31-12V12L19 20H-26Q-31 20-31 16Z"
-          fill="#263842" stroke="#f3f8f8" stroke-width="2.6" stroke-linejoin="round" />
-    <path d="M-26-14Q-26-16-23-16H9L15-10V10L9 16H-23Q-26 16-26 14Z" fill="#d8e5e6" />
-    <path d="M-24-16H-17V16H-24Q-27 16-27 13V-13Q-27-16-24-16Z" :fill="color" />
-    <path d="M-12-10H5L10-6V6L5 10H-12Z" fill="#b4c8ca" />
-    <path d="M17-6L24 0L17 6" fill="none" stroke="#fff" stroke-width="3.4"
+    <path d="M-31-13L-25-19H23L31-12V12L23 19H-25L-31 13Z"
+          fill="#29353e" stroke="#f0f4f6" stroke-width="2.4" stroke-linejoin="round" />
+    <rect x="-19" y="-14" width="33" height="28" rx="3" fill="#44515b" />
+    <path d="M-28-11L-24-15H-22V15H-24L-28 11Z" :fill="color" />
+    <g v-if="loaded" class="robot-load">
+      <rect x="-18" y="-14" width="31" height="28" rx="2" fill="#e9b469" stroke="#362d25" stroke-width="2" />
+      <path d="M-8-12V12M3-12V12" fill="none" stroke="#99632e" stroke-width="2.5" />
+      <path v-if="detailed" d="M-15-10V10M10-10V10" stroke="#f8d39b" stroke-width="1.5" />
+    </g>
+    <path d="M17-6L25 0L17 6" fill="none" stroke="#f5f8fa" stroke-width="3.3"
           stroke-linecap="round" stroke-linejoin="round" />
-    <g v-if="detailed">
-      <path d="M-8-5H3M-8-1H3M-8 3H0" stroke="#8aa5a9" stroke-width="1.5" stroke-linecap="round" />
-      <g fill="#83999c">
-        <circle cx="-12" cy="-13" r="1" />
-        <circle cx="-12" cy="13" r="1" />
-      </g>
-    </g>
   </g>
 </template>

@@ -92,6 +92,7 @@ describe('Robot v2 (контракт, раздел 5.1) → внутренний
     expect(r.x).toBe(12.4)
     expect(r.mapId).toBe('map_1')
     expect(r.mission).toBe('m-102')
+    expect(r.loads).toEqual([])
     expect(r.connection).toBe('ONLINE')
     expect(r.positionInitialized).toBe(true)
   })
@@ -102,7 +103,14 @@ describe('Robot v2 (контракт, раздел 5.1) → внутренний
     expect(r.driving).toBe(false)
     expect(r.battery).toBe(0)
     expect(r.mission).toBe(null)
+    expect(r.loads).toEqual([])
     expect(r.connection).toBe('UNKNOWN')
+  })
+
+  it('preserves every reported load even when the robot supplies no identifiers', () => {
+    const loads = [{ loadId: 'p-42', loadType: 'pallet' }, { loadId: '', loadType: '' }]
+    const source = { ...robot, status: { ...robot.status, loads, missionId: null } }
+    expect(S.toViewRobot(S.RobotV2.parse(source)).loads).toEqual(loads)
   })
 
   it('register request checks the id like the server does', () => {
