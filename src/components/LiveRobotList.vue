@@ -5,6 +5,7 @@ import { availabilityOf } from '../lib/availability'
 const props = defineProps({
   robots: { type: Array, required: true },
   selectedId: { type: String, default: null },
+  emptyMessage: { type: String, default: 'No registered robots' },
 })
 const emit = defineEmits(['select'])
 
@@ -20,6 +21,12 @@ function close() {
   open.value = false
   toggle.value?.focus()
 }
+
+function showGroup() {
+  query.value = ''
+  open.value = true
+}
+defineExpose({ showGroup })
 </script>
 
 <template>
@@ -51,7 +58,7 @@ function close() {
           </li>
         </ul>
         <p v-else role="status" class="px-3 pb-3 text-xs text-(color:--ui-muted)">
-          {{ robots.length ? 'No matching robots' : 'No registered robots' }}
+          {{ robots.length ? 'No matching robots' : emptyMessage }}
         </p>
       </template>
     </div>

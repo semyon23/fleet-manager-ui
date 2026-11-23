@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { availabilityStateOf } from '../lib/availability'
 
 export const useRobotsStore = defineStore('robots', () => {
   // Стартуем ВСЕГДА с пустого списка — и в mock, и в real.
@@ -11,7 +12,7 @@ export const useRobotsStore = defineStore('robots', () => {
   const byState = computed(() => {
     const result = { total: robots.value.length }
     for (const r of robots.value) {
-      const state = r.availability?.state || 'UNKNOWN'
+      const state = availabilityStateOf(r)
       result[state] = (result[state] || 0) + 1
     }
     return result

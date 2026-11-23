@@ -29,15 +29,19 @@ export function clearAlarm(id) {
   return copy(alarm)
 }
 
-export function listAlarms({ active, acknowledged, robotId, severity, limit = 50 } = {}) {
+const cursorOf = (alarm) => `${Date.parse(alarm.createdAt)}:${alarm.id}`
+
+export function listAlarms({ active, acknowledged, robotId, severity, limit = 50, before } = {}) {
   const severities = severity ? String(severity).split(',') : null
   const items = MOCK_ALARMS
     .filter((a) => active === undefined || String(a.active) === String(active))
     .filter((a) => acknowledged === undefined || String(!!a.acknowledgedAt) === String(acknowledged))
     .filter((a) => !robotId || a.robotId === robotId)
     .filter((a) => !severities || severities.includes(a.severity))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  return { items: copy(items.slice(0, Number(limit))), nextCursor: null }
+    .filter((a) => !before || cursorOf(a).localeCompare(before) < 0)
+    .sort((a, b) => cursorOf(b).localeCompare(cursorOf(a)))
+  const page = items.slice(0, Number(limit))
+  return { items: copy(page), nextCursor: page.length && items.length > page.length ? cursorOf(page.at(-1)) : null }
 }
 
 export function getAlarm(id) {

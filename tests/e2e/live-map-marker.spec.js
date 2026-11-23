@@ -23,7 +23,7 @@ function robot(id, state, x, theta) {
 }
 
 async function openLiveMap(page, fleet = [robot('AMR-07', 'IDLE', 4, Math.PI / 2), robot('AMR-12', 'CHARGING', 16, 0)],
-                           { waypoints = [], edges = [], routes = [], missions = [] } = {}) {
+                           { waypoints = [], edges = [], routes = [], missions = [], alarms = [] } = {}) {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.route('**/config.js', route => route.fulfill({
     contentType: 'application/javascript',
@@ -35,11 +35,16 @@ async function openLiveMap(page, fleet = [robot('AMR-07', 'IDLE', 4, Math.PI / 2
     '/api/fms/maps/workshop': { ...map, waypoints, edges, pgmDataUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="160"%3E%3Crect width="200" height="160" fill="gray"/%3E%3C/svg%3E' },
     '/api/fms/robots': fleet,
     '/api/fms/routes': { items: routes },
-    '/api/fms/alarms': { items: [], nextCursor: null },
   }
   for (const mission of missions) responses[`/api/fms/missions/${mission.id}`] = mission
   await page.route('**/api/**', route => {
-    const path = new URL(route.request().url()).pathname
+    const { pathname: path, searchParams } = new URL(route.request().url())
+    if (path === '/api/fms/alarms') {
+      const items = alarms.filter(alarm =>
+        (!searchParams.has('active') || searchParams.get('active') === String(alarm.active)) &&
+        (!searchParams.has('acknowledged') || searchParams.get('acknowledged') === String(!!alarm.acknowledgedAt)))
+      return route.fulfill({ json: { items, nextCursor: null } })
+    }
     return Object.hasOwn(responses, path)
       ? route.fulfill({ json: responses[path] })
       : route.fulfill({ status: 404 })
@@ -158,6 +163,100 @@ test('Live Map shows reported loads independently of missions and updates the se
   await expect(onMission.locator('.robot-load')).toHaveCount(0)
   await expect(details.locator('.robot-load')).toHaveCount(0)
   await expect(onMission.locator('.robot-hub')).toBeVisible()
+})
+
+test('Live Map status counters filter the roster, map markers and routes as telemetry changes', async ({ page }) => {
+  const busy = robot('AMR-01', 'BUSY', 4, 0)
+  busy.status.missionId = 'M-81'
+  const offline = robot('AMR-02', 'OFFLINE', 8, 0)
+  offline.status.connection = 'OFFLINE'
+  const charging = robot('AMR-03', 'CHARGING', 12, 0)
+  await openLiveMap(page, [busy, offline, charging], {
+    waypoints: [{ id: 'A', u: 20, v: 80 }, { id: 'B', u: 120, v: 85 }],
+    edges: [{ id: 'AB', from: 'A', to: 'B' }],
+    routes: [{
+      robotId: busy.id, mapId: map.id, missionId: busy.status.missionId, stepIndex: 0,
+      released: { nodes: ['A', 'B'], edges: ['AB'] }, planned: { nodes: [], edges: [] },
+      goals: ['B'], nextMissionId: null,
+    }],
+  })
+  const filters = page.getByRole('group', { name: 'Fleet status filters' })
+  const all = filters.getByRole('button', { name: 'All robots (3)', exact: true })
+  const route = page.locator('.fleet-route[data-robot-id="AMR-01"]')
+  const list = page.getByRole('list', { name: 'Fleet robots' })
+  const buttons = list.getByRole('button')
+  const markers = page.locator('.robot-marker')
+  await expect(all).toHaveAttribute('aria-pressed', 'true')
+  await expect(route).toBeVisible()
+  await expect(markers).toHaveCount(3)
+
+  await filters.getByRole('button', { name: 'Offline (1)', exact: true }).click()
+  await expect(buttons).toHaveCount(1)
+  await expect(buttons).toContainText(offline.id)
+  await expect(markers).toHaveCount(1)
+  await expect(route).toHaveCount(0)
+  await buttons.click()
+  await expect(page.getByRole('button', { name: 'AMR-02 · Offline', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('img', { name: 'AMR-02 · Offline', exact: true })).toBeVisible()
+
+  await expect(filters.getByRole('button', { name: 'Charging (1)', exact: true })).toBeVisible()
+  offline.availability.state = 'CHARGING'
+  offline.status.connection = 'ONLINE'
+  offline.status.power.charging = true
+  const emptyGroup = filters.getByRole('button', { name: 'Offline (0)', exact: true })
+  await expect(emptyGroup).toHaveAttribute('aria-pressed', 'true', { timeout: 15_000 })
+  await expect(page.getByRole('button', { name: 'Robot details', exact: true })).toHaveAttribute('aria-expanded', 'false')
+  await expect(page).not.toHaveURL(/robotId=/)
+  await expect(page.getByText('No robots in this group', { exact: true })).toBeVisible()
+  await expect(markers).toHaveCount(0)
+
+  await filters.getByRole('button', { name: 'Charging (2)', exact: true }).click()
+  await expect(buttons).toHaveCount(2)
+  await expect(markers).toHaveCount(2)
+  const search = page.getByRole('searchbox', { name: 'Search robots by ID' })
+  await search.fill(charging.id)
+  await expect(buttons).toHaveCount(1)
+  await expect(buttons).toContainText(charging.id)
+  await search.fill(busy.id)
+  await expect(buttons).toHaveCount(0)
+  await search.fill('')
+  await all.click()
+  await expect(all).toHaveAttribute('aria-pressed', 'true')
+  await expect(buttons).toHaveCount(3)
+  await expect(markers).toHaveCount(3)
+  await expect(route).toBeVisible()
+})
+
+test('Live Map alarm counter includes each registered robot with an active alarm once', async ({ page }) => {
+  const fleet = [robot('AMR-01', 'IDLE', 4, 0), robot('AMR-02', 'IDLE', 8, 0), robot('AMR-03', 'IDLE', 12, 0)]
+  fleet[1].status.pose = null
+  fleet[1].status.localized = false
+  const createdAt = '2026-01-01T12:00:00Z'
+  const handledAt = '2026-01-01T12:01:00Z'
+  const alarm = {
+    id: 'a1', severity: 'ERROR', source: 'ROBOT', code: 'LIFT', title: 'Lift blocked', detail: '',
+    robotId: fleet[0].id, missionId: null, active: true, createdAt,
+    clearedAt: null, acknowledgedAt: null, acknowledgedBy: null,
+  }
+  await openLiveMap(page, fleet, { alarms: [
+    alarm, { ...alarm, id: 'a2' },
+    { ...alarm, id: 'a3', robotId: fleet[1].id, acknowledgedAt: handledAt, acknowledgedBy: 'operator' },
+    { ...alarm, id: 'a4', robotId: fleet[2].id, active: false, clearedAt: handledAt },
+    { ...alarm, id: 'a5', robotId: null, source: 'SYSTEM' },
+    { ...alarm, id: 'a6', robotId: 'removed-robot' },
+  ] })
+  const filters = page.getByRole('group', { name: 'Fleet status filters' })
+  await filters.getByRole('button', { name: 'With alarms (2)', exact: true }).click()
+  const rows = page.getByRole('list', { name: 'Fleet robots' }).getByRole('button')
+  await expect(rows).toHaveCount(2)
+  await expect(rows.filter({ hasText: fleet[0].id })).toBeVisible()
+  await expect(page.locator('.robot-marker')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: 'AMR-01 · Idle', exact: true })).toBeVisible()
+  await rows.filter({ hasText: fleet[1].id }).click()
+  const details = page.locator('#live-map-robot-details')
+  await expect(details).toContainText(fleet[1].id)
+  await expect(details).toContainText(/position unavailable/i)
+  await expect(page.getByRole('button', { name: /^AMR-02 ·/ })).toHaveCount(0)
 })
 
 test('Live Map diagnoses the selected robot from its current mission and hides stale error hints', async ({ page }) => {

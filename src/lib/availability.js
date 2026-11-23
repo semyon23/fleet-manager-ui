@@ -16,8 +16,13 @@ export const AVAILABILITY = {
 // availability ещё не посчитана (робот только что зарегистрирован)
 const UNKNOWN = { label: 'Unknown', color: '#94a3b8' }
 
+export function availabilityStateOf(robot) {
+  const state = robot?.availability?.state
+  return Object.hasOwn(AVAILABILITY, state) ? state : 'UNKNOWN'
+}
+
 export function availabilityOf(robot) {
-  return AVAILABILITY[robot?.availability?.state] || UNKNOWN
+  return AVAILABILITY[availabilityStateOf(robot)] || UNKNOWN
 }
 
 export function batteryColor(level, healthyColor = 'var(--ui-primary)') {

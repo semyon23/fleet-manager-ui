@@ -1,10 +1,12 @@
 <script setup>
 import { useRobotsStore } from '../stores/robots'
+import { useAlarmsStore } from '../stores/alarms'
 import { useMapsStore } from '../stores/maps'
 import { NCard, NSelect, NButton, NPopover, NCheckbox } from 'naive-ui'
 import { ref, shallowRef, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { robotLook, footprintPx } from '../lib/robotLook'
+import { availabilityStateOf } from '../lib/availability'
 import { createLiveRoutePoller } from '../lib/liveRoutePolling'
 import { releasedPoints, plannedPoints, goalPoints, toPolyline, routePolylines, routeColorFor } from '../lib/robotRoutes'
 import * as api from '../api'
@@ -16,10 +18,12 @@ import { useSelectedRobotMission } from '../composables/useSelectedRobotMission'
 import PlaceRobotDialog from '../components/PlaceRobotDialog.vue'
 import MapRobotShape from '../components/MapRobotShape.vue'
 import LiveRobotList from '../components/LiveRobotList.vue'
+import FleetStatusCounters from '../components/FleetStatusCounters.vue'
 import RobotDiagnostics from '../components/RobotDiagnostics.vue'
 import FleetStatusTag from '../components/FleetStatusTag.vue'
 
 const robots = useRobotsStore()
+const alarms = useAlarmsStore()
 const maps = useMapsStore()
 const route = useRoute()
 const router = useRouter()
@@ -31,6 +35,27 @@ const hoveredId = ref(null)
 const following = ref(false)
 const detailsOpen = ref(false)
 const detailsToggle = ref(null)
+const showPlace = ref(false)
+const roster = ref(null)
+const fleetFilter = ref('ALL')
+
+const alarmCount = computed(() => alarms.hasLoaded
+  ? robots.robots.filter(robot => alarms.activeRobotIds.has(robot.id)).length
+  : null)
+function matchesStatus(robot) {
+  if (fleetFilter.value === 'WITH_ALARMS') return alarms.activeRobotIds.has(robot.id)
+  return availabilityStateOf(robot) === fleetFilter.value
+}
+const matchingFleet = computed(() => fleetFilter.value === 'ALL' ? robots.robots : robots.robots.filter(matchesStatus))
+const rosterEmptyMessage = computed(() => {
+  if (!robots.lastPollAt) return robots.lastPollError ? 'Fleet unavailable' : 'Loading robots…'
+  return fleetFilter.value === 'ALL' ? 'No registered robots' : 'No robots in this group'
+})
+function selectFleetFilter(key) {
+  fleetFilter.value = key
+  hoveredId.value = null
+  roster.value?.showGroup()
+}
 
 function hasPosition(r) {
   return !!r?.mapId && r.positionInitialized && Number.isFinite(r.x) && Number.isFinite(r.y)
@@ -64,8 +89,21 @@ function selectRobot(id) {
 const selectedMapId = ref(null)
 const mapPicked = ref(false)
 watch(() => route.query.robotId, (id) => {
+  // Ссылка из Events или из истории браузера должна открыть робота даже вне выбранной группы.
+  if (id && fleetFilter.value !== 'ALL' && !matchingFleet.value.some(robot => robot.id === id)) {
+    fleetFilter.value = 'ALL'
+  }
   focusRobot(typeof id === 'string' && id ? id : null)
 }, { immediate: true })
+watch(() => fleetFilter.value !== 'ALL' && selectedId.value && robots.lastPollAt &&
+  (!selected.value || !matchesStatus(selected.value)), (outsideGroup) => {
+  if (!outsideGroup) return
+  if (route.query.robotId === selectedId.value) router.replace({ query: { ...route.query, robotId: undefined } })
+  if (following.value) zoomReset()
+  focusRobot(null)
+  detailsOpen.value = false
+  showPlace.value = false
+})
 watchEffect(() => {
   if (following.value && selectedId.value) {
     selectedMapId.value = selected.value?.mapId || null
@@ -135,11 +173,10 @@ const robotSize = computed(() =>
   footprintPx(activeMap.value?.meta?.resolution, ROBOT_MIN_SCREEN_PX * perScreenPx.value))
 const detailedRobots = computed(() => robotSize.value.length / perScreenPx.value >= 44)
 
-const filteredRobots = computed(() =>
+const positionedRobots = computed(() =>
   activeMap.value ? robots.robots.filter((r) => r.mapId === activeMap.value.id && hasPosition(r)) : [],
 )
-const elsewhereCount = computed(() => robots.robots.filter((r) => r.mapId !== selectedMapId.value).length)
-const showPlace = ref(false)
+const elsewhereCount = computed(() => matchingFleet.value.filter((r) => r.mapId !== selectedMapId.value).length)
 
 // === Слои карты: что показывать — выбирает оператор, запоминаем в этом браузере ===
 const LAYERS = [
@@ -354,7 +391,7 @@ const roads = computed(() => {
 
 // Поза робота — метры карты; на экране — пиксели картинки карты (как узлы), ось Y вниз
 const markers = computed(() =>
-  filteredRobots.value.map((r) => {
+  positionedRobots.value.map((r) => {
     const { u, v } = worldToPixel(activeMap.value.meta, r.x, r.y, activeMap.value.height)
     const look = robotLook(r)
     const missionLabel = r.mission?.length > 15
@@ -376,11 +413,12 @@ const markers = computed(() =>
     }
   }),
 )
-const selectedMarker = computed(() => markers.value.find(m => m.id === selectedId.value))
+const visibleMarkers = computed(() => fleetFilter.value === 'ALL' ? markers.value : markers.value.filter(matchesStatus))
+const selectedMarker = computed(() => visibleMarkers.value.find(m => m.id === selectedId.value))
 const selectedRoute = computed(() => selectedMarker.value?.route)
 const markersInDrawOrder = computed(() => selectedMarker.value
-  ? [...markers.value.filter((m) => m.id !== selectedId.value), selectedMarker.value]
-  : markers.value)
+  ? [...visibleMarkers.value.filter((m) => m.id !== selectedId.value), selectedMarker.value]
+  : visibleMarkers.value)
 
 watchEffect(() => {
   if (!following.value) return
@@ -430,7 +468,7 @@ const routeLines = computed(() => {
       goals: goalPoints(m.route, position),
     }))
 })
-const hovered = computed(() => markers.value.find(m => m.id === hoveredId.value))
+const hovered = computed(() => visibleMarkers.value.find(m => m.id === hoveredId.value))
 const tooltipTransform = computed(() => {
   const { x, y, width, height } = viewport.value
   const unit = perScreenPx.value
@@ -484,9 +522,15 @@ const tooltipTransform = computed(() => {
         </NPopover>
       </template>
 
+      <FleetStatusCounters class="mb-2" :by-state="robots.byState" :fleet-ready="!!robots.lastPollAt"
+                           :alarm-count="alarmCount" :selected="fleetFilter" @select="selectFleetFilter" />
+      <p v-if="robots.lastPollError || alarms.error" role="status" class="mb-2 flex flex-wrap gap-x-1 text-xs text-(color:--ui-muted)">
+        <span v-if="robots.lastPollError">{{ robots.lastPollAt ? 'Showing last known fleet counts.' : 'Fleet counts unavailable.' }}</span>
+        <span v-if="alarms.error">{{ alarms.hasLoaded ? 'Showing the last known alarm count.' : 'Alarm count unavailable.' }}</span>
+      </p>
       <div
         class="relative overflow-hidden rounded border border-(--ui-border) bg-(--ui-canvas)"
-        style="height: calc(100vh - 11rem); min-height: 480px"
+        style="height: calc(100vh - 13.5rem); min-height: 480px"
       >
         <svg
           ref="svgRef"
@@ -700,7 +744,8 @@ const tooltipTransform = computed(() => {
           <div v-if="routeNotice" role="status" class="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
             {{ routeNotice }}
           </div>
-          <LiveRobotList :robots="robots.robots" :selected-id="selectedId" @select="selectRobot" />
+          <LiveRobotList ref="roster" :robots="matchingFleet" :selected-id="selectedId"
+                         :empty-message="rosterEmptyMessage" @select="selectRobot" />
         </div>
         <div class="absolute right-3 top-3 flex flex-col overflow-hidden rounded border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <button
