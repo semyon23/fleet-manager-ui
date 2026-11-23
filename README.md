@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/banner.svg" alt="Fleet UI — web UI of the fms: robots, live map, map editor, missions and alarms" width="100%">
+  <img src="docs/banner.svg" alt="COMPASS Fleet Control — интерфейс управления парком. AMR с грузом проезжает перекрёсток, второй робот ожидает разрешения." width="100%">
 </p>
 
 # Fleet UI
@@ -75,7 +75,11 @@ npm install
 npm run dev
 ```
 
-Откроется `http://localhost:5175/fleet-manager/`. Сборка и её проверка:
+Откройте `http://localhost:5175/fleet-manager/`. Для демо-входа логин и пароль — `admin`.
+После входа заставка на 3,5 секунды показывает проезд трёх AMR через перекрёсток, затем открывается запрошенный экран.
+Браузер проверяет данные локально и запоминает вход на время сессии вкладки.
+
+Сборка и её проверка:
 
 ```bash
 npm run build && npm run preview

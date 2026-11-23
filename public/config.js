@@ -19,7 +19,7 @@
  *                    (amr/v3/<manufacturer>/<serialNumber>/visualization).
  */
 window.__FLEET_CONFIG__ = {
-  apiBaseUrl: '',
+  apiBaseUrl: 'http://192.168.0.105:5000/api',
   useMocks: null,
   mqttUrl: '',
   mqttUser: '',

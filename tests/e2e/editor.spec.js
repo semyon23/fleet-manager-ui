@@ -7,6 +7,7 @@ test.describe('Map Editor — базовые сценарии', () => {
     await page.goto('maps')
     await page.evaluate(() => localStorage.clear())
     await page.reload()
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click()
     await page.getByText(/Warehouse 25/).first().waitFor({ timeout: 20_000 })
     await page.getByText(/Warehouse 25/).first().click()
     await page.waitForURL(/\/maps\/[^/]+$/)

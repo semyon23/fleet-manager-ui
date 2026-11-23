@@ -2,8 +2,9 @@
 import { useRobotsStore } from '../stores/robots'
 import { useMapsStore } from '../stores/maps'
 import { NCard, NTag, NSelect, NButton, NPopover, NCheckbox } from 'naive-ui'
-import { ref, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
+import { ref, shallowRef, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
 import { robotLook, footprintPx } from '../lib/robotLook'
+import { createLiveRoutePoller } from '../lib/liveRoutePolling'
 import { releasedPoints, plannedPoints, goalPoints, toPolyline } from '../lib/robotRoutes'
 import * as api from '../api'
 import { stationKindMeta } from '../lib/theme'
@@ -11,8 +12,7 @@ import { zoneTypeMeta } from '../lib/vda5050'
 import { worldToPixel } from '../lib/nav2meta'
 import { worldAngleToSvgDeg } from '../lib/geometry'
 import PlaceRobotDialog from '../components/PlaceRobotDialog.vue'
-import RobotShape from '../components/RobotShape.vue'
-import RobotIcon from '../components/RobotIcon.vue'
+import MapRobotShape from '../components/MapRobotShape.vue'
 
 const robots = useRobotsStore()
 const maps = useMapsStore()
@@ -72,6 +72,7 @@ const perScreenPx = computed(() => {
 const ROBOT_MIN_SCREEN_PX = 22
 const robotSize = computed(() =>
   footprintPx(activeMap.value?.meta?.resolution, ROBOT_MIN_SCREEN_PX * perScreenPx.value))
+const detailedRobots = computed(() => robotSize.value.length / perScreenPx.value >= 44)
 
 const filteredRobots = computed(() =>
   activeMap.value ? robots.robots.filter((r) => r.mapId === activeMap.value.id) : [],
@@ -104,20 +105,40 @@ const showRobotRoutes = computed(() => layers.value.routes || layers.value.plann
 
 // === Маршруты роботов (контракт 7.4): опрос, пока страница открыта и вкладка видна (9.1) ===
 const ROUTES_POLL_MS = 1500
-const robotRoutes = ref([])
+const routeData = shallowRef()
+const staleStarts = new Map()
+const routePoller = createLiveRoutePoller({
+  listRoutes: api.routes.listRoutes,
+  isVisible: () => !document.hidden,
+  onChange(snapshot) {
+    staleStarts.clear()
+    if (snapshot.status === 'stale') {
+      // Зафиксировать начало видимой линии до того, как придёт следующая MQTT-поза.
+      for (const m of markers.value) {
+        if (m.route) staleStarts.set(m.id, { x: m.px, y: m.py })
+      }
+    }
+    routeData.value = snapshot
+  },
+})
+watch(selectedMapId, (id) => routePoller.selectMap(id), { immediate: true })
 let routesTimer = null
-async function pollRoutes() {
-  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
-  try {
-    robotRoutes.value = selectedMapId.value ? await api.routes.listRoutes(selectedMapId.value) : []
-  } catch (e) {
-    console.warn('[live-map] routes not loaded:', e.message)   // карта и роботы работают и без маршрутов
-  }
-}
-onMounted(() => { pollRoutes(); routesTimer = setInterval(pollRoutes, ROUTES_POLL_MS) })
-onBeforeUnmount(() => { if (routesTimer) clearInterval(routesTimer) })
-watch(selectedMapId, () => { robotRoutes.value = []; pollRoutes() })
-const routeByRobot = computed(() => new Map(robotRoutes.value.map((r) => [r.robotId, r])))
+onMounted(() => {
+  routesTimer = setInterval(routePoller.refresh, ROUTES_POLL_MS)
+  document.addEventListener('visibilitychange', routePoller.refresh)
+})
+onBeforeUnmount(() => {
+  clearInterval(routesTimer)
+  document.removeEventListener('visibilitychange', routePoller.refresh)
+  routePoller.dispose()
+})
+const routeByRobot = computed(() => new Map(routeData.value.routes.map((r) => [r.robotId, r])))
+const routesStale = computed(() => routeData.value.status === 'stale')
+const routeNotice = computed(() => {
+  if (routeData.value.status === 'unavailable') return 'Routes unavailable'
+  if (!routesStale.value) return ''
+  return 'Route data is out of date · Last updated ' + new Date(routeData.value.updatedAt).toLocaleString('en-GB')
+})
 
 // Зоны карты из редактора: полупрозрачные полигоны под маршрутами, только для просмотра
 const zones = computed(() => {
@@ -259,14 +280,17 @@ const markers = computed(() =>
       ...r,
       px: PADDING + u,
       py: PADDING + v,
-      look,
       stroke: look.color,
       stateLabel: look.label,
+      labelWidth: 22 + r.id.length * 6.7, // точка состояния, моноширинный ID и поля в экранных пикселях
       rotateDeg: worldAngleToSvgDeg(r.theta),
       route: routeByRobot.value.get(r.id) || null,
     }
   }),
 )
+const markersInDrawOrder = computed(() => selected.value
+  ? [...markers.value.filter((m) => m.id !== selectedId.value), selected.value]
+  : markers.value)
 
 // Узел карты → точка на картинке (как у дорог); узла нет — null
 const nodePositions = computed(() => {
@@ -301,7 +325,8 @@ const routeLines = computed(() => {
       id: m.id,
       color: m.stroke,
       selected: m.id === selectedId.value,
-      released: toPolyline(releasedPoints(m.route, position, { x: m.px, y: m.py })),
+      released: toPolyline(releasedPoints(m.route, position,
+        routesStale.value ? staleStarts.get(m.id) : { x: m.px, y: m.py })),
       planned: toPolyline(plannedPoints(m.route, position)),
       goals: goalPoints(m.route, position),
     }))
@@ -443,16 +468,18 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
           </g>
 
           <!-- Маршруты роботов: сплошная — разрешено ехать, пунктир — запланировано, ромбы — цели шагов -->
-          <g v-for="r in routeLines" :key="'route-' + r.id" fill="none" stroke-linecap="round" stroke-linejoin="round"
-             pointer-events="none" :opacity="r.selected || !selectedId ? 0.9 : 0.45">
-            <polyline v-if="layers.routes && r.released" :points="r.released" :stroke="r.color"
-                      :stroke-width="r.selected ? robotSize.width * 0.35 : 1.5" />
-            <polyline v-if="layers.planned && r.planned" :points="r.planned" :stroke="r.color"
-                      :stroke-width="r.selected ? robotSize.width * 0.2 : 1" stroke-dasharray="4 3" />
-            <rect v-for="goal in (layers.goals ? r.goals : [])" :key="goal.id"
-                  :x="goal.x - 4" :y="goal.y - 4" width="8" height="8"
-                  :transform="`rotate(45 ${goal.x} ${goal.y})`"
-                  :stroke="r.color" :stroke-width="r.selected ? 1.8 : 1" class="fill-white dark:fill-slate-900" />
+          <g :opacity="routesStale ? 0.45 : 1">
+            <g v-for="r in routeLines" :key="'route-' + r.id" fill="none" stroke-linecap="round" stroke-linejoin="round"
+               pointer-events="none" :opacity="r.selected || !selectedId ? 0.9 : 0.45">
+              <polyline v-if="layers.routes && r.released" :points="r.released" :stroke="r.color"
+                        :stroke-width="r.selected ? robotSize.width * 0.35 : 1.5" />
+              <polyline v-if="layers.planned && r.planned" :points="r.planned" :stroke="r.color"
+                        :stroke-width="r.selected ? robotSize.width * 0.2 : 1" stroke-dasharray="4 3" />
+              <rect v-for="goal in (layers.goals ? r.goals : [])" :key="goal.id"
+                    :x="goal.x - 4" :y="goal.y - 4" width="8" height="8"
+                    :transform="`rotate(45 ${goal.x} ${goal.y})`"
+                    :stroke="r.color" :stroke-width="r.selected ? 1.8 : 1" class="fill-white dark:fill-slate-900" />
+            </g>
           </g>
 
           <!-- Путь робота: длинный (plannedPath) — пунктир, ближний (intermediatePath) — сплошная -->
@@ -464,30 +491,39 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
           </g>
 
           <g
-            v-for="m in markers"
+            v-for="m in markersInDrawOrder"
             :key="m.id"
             class="robot-marker"
             :style="{ transform: `translate(${m.px}px, ${m.py}px)` }"
+            role="button"
+            tabindex="0"
+            :aria-label="`${m.id} · ${m.stateLabel}`"
+            :aria-pressed="m.id === selectedId"
             @click.stop="selectedId = m.id"
+            @keydown.enter.prevent="selectedId = m.id"
+            @keydown.space.prevent="selectedId = m.id"
             @mouseenter="hovered = m"
             @mouseleave="hovered = null"
           >
             <!-- Невидимая подложка: попасть мышью по маленькому роботу -->
-            <circle :r="robotSize.length * 0.75" fill="transparent" />
-            <RobotShape
+            <circle :r="Math.max(robotSize.length * 0.75, 22 * perScreenPx)" fill="transparent" />
+            <MapRobotShape
               :length="robotSize.length"
-              :width="robotSize.width"
-              :look="m.look"
+              :color="m.stroke"
               :rotate="m.rotateDeg"
-              :selected="m.id === selectedId || hovered?.id === m.id"
+              :selected="m.id === selectedId"
+              :detailed="detailedRobots"
             />
             <!-- Имя — на подложке и одного размера на экране при любом zoom -->
-            <g v-if="layers.robotLabels" :transform="`translate(0 ${robotSize.length * 0.7 + 9 * perScreenPx})`">
-              <rect :x="-(m.id.length * 3.6 + 5) * perScreenPx" :y="-7 * perScreenPx"
-                    :width="(m.id.length * 7.2 + 10) * perScreenPx" :height="14 * perScreenPx" :rx="3 * perScreenPx"
-                    fill="#1e293b" fill-opacity="0.85" />
-              <text y="0" text-anchor="middle" dominant-baseline="central" :font-size="11 * perScreenPx"
-                    font-family="JetBrains Mono, monospace" fill="#ffffff">{{ m.id }}</text>
+            <g v-if="layers.robotLabels"
+               :transform="`translate(0 ${robotSize.length * 0.75 + 10 * perScreenPx}) scale(${perScreenPx})`">
+              <rect :x="-m.labelWidth / 2" y="-8" :width="m.labelWidth" height="16" rx="4"
+                    :class="m.id === selectedId ? 'fill-[#173f52] stroke-[#173f52] dark:fill-[#d5f2ff] dark:stroke-[#d5f2ff]'
+                                                : 'fill-white stroke-[#c1cfd3] dark:fill-[#22313c] dark:stroke-[#485d68]'" />
+              <circle :cx="8 - m.labelWidth / 2" cy="0" r="3.5" :fill="m.stroke" />
+              <text :x="15 - m.labelWidth / 2" y="0" dominant-baseline="central" font-size="11"
+                    :class="m.id === selectedId ? 'fill-white dark:fill-[#132734]' : 'fill-[#192c38] dark:fill-[#e5edf2]'"
+                    font-family="ui-monospace, monospace">{{ m.id }}</text>
             </g>
           </g>
 
@@ -544,6 +580,11 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
           </g><!-- /zoomTransform -->
         </svg>
 
+        <div role="status" class="pointer-events-none absolute left-3 right-14 top-3">
+          <span v-if="routeNotice" class="inline-block rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+            {{ routeNotice }}
+          </span>
+        </div>
         <div class="absolute right-3 top-3 flex flex-col overflow-hidden rounded border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <button
             class="grid h-8 w-8 place-items-center border-b border-slate-100 text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -585,7 +626,9 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
       <div v-if="!selected" class="text-sm text-slate-500">Click a robot to see full details.</div>
       <div v-else class="flex flex-col gap-3 text-sm">
         <div class="grid place-items-center rounded bg-slate-100 py-3 dark:bg-slate-800">
-          <RobotIcon :robot="selected" :size="96" />
+          <svg width="96" height="96" viewBox="-42 -42 84 84" role="img" :aria-label="`${selected.id} · ${selected.stateLabel}`">
+            <MapRobotShape :length="62" :color="selected.stroke" :rotate="selected.rotateDeg" detailed />
+          </svg>
         </div>
         <div class="flex justify-between"><span class="text-slate-500">Model</span><span class="font-mono">{{ selected.model }}</span></div>
         <div class="flex justify-between">
@@ -602,6 +645,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
         <div class="flex justify-between"><span class="text-slate-500">Last node</span><span class="font-mono text-xs">{{ selected.lastNodeId || '-' }}</span></div>
         <div class="flex justify-between"><span class="text-slate-500">Mission</span><span class="font-mono text-xs">{{ selected.mission || '-' }}</span></div>
         <template v-if="selected.route">
+          <div v-if="routesStale" class="text-xs font-medium text-amber-700 dark:text-amber-300">Last known route</div>
           <div class="flex justify-between">
             <span class="text-slate-500">Step</span>
             <span class="font-mono text-xs">{{ selected.route.stepIndex + 1 }} → {{ selected.route.goals[0] }}</span>

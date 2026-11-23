@@ -1,145 +1,328 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title description" font-family="Inter, 'Segoe UI', Arial, sans-serif">
+  <title id="title">COMPASS Fleet Control — Fleet UI</title>
+  <desc id="description">Three mobile robots share a warehouse crossing. A loaded robot follows the green clearance while another waits at the amber stop line.</desc>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0f1b2d"/>
-      <stop offset="1" stop-color="#16324f"/>
-    </linearGradient>
-    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
-      <path d="M32 0H0V32" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-    </pattern>
-    <linearGradient id="wordmark" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#bfdbfe"/>
+    <radialGradient id="backdrop" cx="0.73" cy="0.46" r="0.87">
+      <stop stop-color="#233b49"/>
+      <stop offset="1" stop-color="#10171f"/>
+    </radialGradient>
+    <linearGradient id="wordmark" x2="100%" y2="0%">
+      <stop stop-color="#bfdbfe"/>
       <stop offset="1" stop-color="#60a5fa"/>
     </linearGradient>
-    <pattern id="mapgrid" width="20" height="20" patternUnits="userSpaceOnUse">
-      <path d="M20 0H0V20" fill="none" stroke="#63b3ed" stroke-opacity="0.08" stroke-width="1"/>
-    </pattern>
-
-    <!-- AMR, top view, centered at (0, 0), heading +x -->
-    <g id="robot">
-      <rect x="-14" y="-10" width="28" height="20" rx="5" fill="#e2e8f0" stroke="#63b3ed" stroke-width="1.5"/>
-      <rect x="-10" y="-4" width="12" height="8" rx="1.5" fill="#cbd5e1"/>
-      <circle cx="8" cy="0" r="3.2" fill="#2d3748"/>
-    </g>
   </defs>
-
-  <rect width="1200" height="360" rx="18" fill="url(#bg)"/>
-  <rect width="1200" height="360" rx="18" fill="url(#grid)"/>
-
-  <!-- ============================ browser window ============================ -->
-  <rect x="540" y="34" width="624" height="292" rx="12" fill="#0b1422" stroke="#334155" stroke-width="1.5"/>
-  <path d="M552 34H1152A12 12 0 0 1 1164 46V62H540V46A12 12 0 0 1 552 34Z" fill="#1e293b"/>
-  <g fill="#475569">
-    <circle cx="558" cy="48" r="4"/>
-    <circle cx="572" cy="48" r="4"/>
-    <circle cx="586" cy="48" r="4"/>
+  <rect width="1200" height="360" rx="16" fill="url(#backdrop)"/>
+  <g transform="translate(58 43)">
+    <path d="M0 12h8l6-12h9L11 23H3Z" fill="#b4ed72"/>
+    <text x="37" y="18" fill="#d3e1e5" font-size="16" font-weight="600" letter-spacing="2.2">FLEET UI</text>
   </g>
-  <rect x="610" y="41" width="230" height="14" rx="7" fill="#0f172a"/>
-  <text x="622" y="51.5" fill="#94a3b8" font-size="9.5">localhost / fleet-manager / live</text>
+  <!-- The bundled Michroma wordmark is outlined for README image renderers. -->
+  <path aria-label="COMPASS" fill="url(#wordmark)" d="M58 135.54V134.73Q58 130.62 58.4 127.82Q58.81 125.03 59.79 123.28Q60.78 121.52 62.49 120.59Q64.19 119.67 66.77 119.33Q69.35 119 72.98 119H81.11Q85.26 119 88.12 119.39Q90.97 119.79 92.72 120.95Q94.46 122.11 95.25 124.35Q96.03 126.6 96.03 130.31H92.16Q92.16 127.39 91.64 125.77Q91.11 124.14 89.87 123.42Q88.63 122.69 86.49 122.52Q84.36 122.35 81.11 122.35H72.98Q70.1 122.35 68.12 122.52Q66.15 122.69 64.91 123.31Q63.67 123.92 63.01 125.25Q62.36 126.58 62.11 128.88Q61.87 131.18 61.87 134.73V135.54Q61.87 138.96 62.11 141.22Q62.36 143.48 63.01 144.83Q63.67 146.18 64.91 146.85Q66.15 147.51 68.12 147.72Q70.1 147.92 72.98 147.92H81.11Q84.36 147.92 86.49 147.78Q88.63 147.64 89.87 146.95Q91.11 146.26 91.64 144.66Q92.16 143.06 92.16 140.15H96.03Q96.03 143.86 95.25 146.08Q94.46 148.3 92.72 149.42Q90.97 150.54 88.12 150.9Q85.26 151.27 81.11 151.27H72.98Q68.45 151.27 65.52 150.65Q62.6 150.03 60.95 148.38Q59.31 146.73 58.66 143.62Q58 140.52 58 135.54ZM122.02 151.27Q117.48 151.27 114.56 150.65Q111.64 150.03 109.99 148.38Q108.35 146.73 107.69 143.62Q107.04 140.52 107.04 135.54V134.73Q107.04 130.62 107.44 127.82Q107.84 125.03 108.83 123.28Q109.82 121.52 111.52 120.59Q113.23 119.67 115.81 119.33Q118.39 119 122.02 119H130.15Q133.78 119 136.36 119.33Q138.94 119.67 140.64 120.59Q142.35 121.52 143.34 123.28Q144.32 125.03 144.73 127.82Q145.13 130.62 145.13 134.73V135.54Q145.13 140.52 144.47 143.62Q143.82 146.73 142.18 148.38Q140.53 150.03 137.61 150.65Q134.68 151.27 130.15 151.27ZM122.02 147.92H130.15Q133.03 147.92 135.01 147.72Q136.98 147.51 138.22 146.85Q139.46 146.18 140.12 144.83Q140.77 143.48 141.02 141.22Q141.26 138.96 141.26 135.54V134.73Q141.26 131.18 141.02 128.88Q140.77 126.58 140.12 125.25Q139.46 123.92 138.22 123.31Q136.98 122.69 135.01 122.52Q133.03 122.35 130.15 122.35H122.02Q119.14 122.35 117.16 122.52Q115.18 122.69 113.94 123.31Q112.7 123.92 112.05 125.25Q111.39 126.58 111.15 128.88Q110.91 131.18 110.91 134.73V135.54Q110.91 138.96 111.15 141.22Q111.39 143.48 112.05 144.83Q112.7 146.18 113.94 146.85Q115.18 147.51 117.16 147.72Q119.14 147.92 122.02 147.92ZM157.45 150.62V119.65H163.21L181.95 144.91L200.4 119.65H206.17V150.62H202.29V123.15L183.8 148.58H180.29L161.32 123.15V150.62ZM219.85 150.62V119.65H240.58Q245.12 119.65 247.89 120.09Q250.67 120.53 252.1 121.57Q253.53 122.61 254.03 124.37Q254.54 126.14 254.54 128.76V129.57Q254.54 132.07 254.02 133.81Q253.51 135.56 252.04 136.62Q250.57 137.69 247.78 138.19Q245 138.68 240.46 138.68H223.72V150.62ZM250.67 128.76Q250.67 126.84 250.3 125.7Q249.94 124.55 248.85 123.96Q247.76 123.38 245.6 123.18Q243.45 122.99 239.84 122.99H223.72V135.33H239.84Q243.45 135.33 245.6 135.1Q247.76 134.87 248.85 134.26Q249.94 133.64 250.3 132.5Q250.67 131.36 250.67 129.57ZM259.94 150.62 278.01 119.65H283.17L301.24 150.62H296.72L292.85 143.52H268.33L264.45 150.62ZM270.26 140.29H290.91L280.59 122.23ZM345.15 141.67Q345.15 139.87 344.87 138.84Q344.59 137.81 343.6 137.32Q342.61 136.83 340.53 136.68Q338.46 136.52 334.85 136.46L323.63 136.3Q319.48 136.24 316.96 135.8Q314.44 135.35 313.15 134.4Q311.86 133.44 311.42 131.83Q310.99 130.21 310.99 127.79Q310.99 125.15 311.59 123.44Q312.18 121.72 313.74 120.75Q315.31 119.79 318.17 119.39Q321.03 119 325.57 119H334.2Q338.32 119 341.06 119.26Q343.8 119.52 345.41 120.47Q347.03 121.42 347.72 123.42Q348.42 125.41 348.42 128.9H344.55Q344.55 126.2 344.03 124.82Q343.52 123.44 342.34 122.93Q341.16 122.43 339.16 122.39Q337.17 122.35 334.2 122.35H325.77Q322.16 122.35 319.99 122.49Q317.83 122.63 316.72 123.13Q315.61 123.64 315.24 124.75Q314.86 125.86 314.86 127.79Q314.86 129.43 315.12 130.41Q315.39 131.4 316.3 131.92Q317.22 132.43 319.14 132.62Q321.05 132.81 324.36 132.85L336.38 133.02Q340.61 133.08 343.14 133.51Q345.68 133.94 346.94 134.91Q348.2 135.88 348.61 137.52Q349.02 139.17 349.02 141.67Q349.02 144.39 348.51 146.23Q347.99 148.08 346.52 149.19Q345.05 150.3 342.27 150.78Q339.48 151.27 334.95 151.27H325.51Q321.38 151.27 318.57 150.9Q315.77 150.54 314.11 149.44Q312.44 148.34 311.72 146.16Q310.99 143.99 310.99 140.36H314.86Q314.86 143.2 315.33 144.75Q315.79 146.3 316.95 146.98Q318.11 147.66 320.2 147.79Q322.28 147.92 325.51 147.92H334.75Q338.36 147.92 340.45 147.69Q342.55 147.45 343.56 146.8Q344.57 146.14 344.86 144.91Q345.15 143.68 345.15 141.67ZM394.13 141.67Q394.13 139.87 393.85 138.84Q393.56 137.81 392.58 137.32Q391.59 136.83 389.51 136.68Q387.43 136.52 383.82 136.46L372.61 136.3Q368.46 136.24 365.94 135.8Q363.42 135.35 362.13 134.4Q360.83 133.44 360.4 131.83Q359.97 130.21 359.97 127.79Q359.97 125.15 360.56 123.44Q361.16 121.72 362.72 120.75Q364.28 119.79 367.15 119.39Q370.01 119 374.55 119H383.18Q387.29 119 390.03 119.26Q392.78 119.52 394.39 120.47Q396 121.42 396.7 123.42Q397.4 125.41 397.4 128.9H393.52Q393.52 126.2 393.01 124.82Q392.49 123.44 391.32 122.93Q390.14 122.43 388.14 122.39Q386.14 122.35 383.18 122.35H374.75Q371.14 122.35 368.97 122.49Q366.8 122.63 365.69 123.13Q364.59 123.64 364.21 124.75Q363.84 125.86 363.84 127.79Q363.84 129.43 364.1 130.41Q364.36 131.4 365.28 131.92Q366.2 132.43 368.11 132.62Q370.03 132.81 373.34 132.85L385.36 133.02Q389.59 133.08 392.12 133.51Q394.65 133.94 395.91 134.91Q397.17 135.88 397.59 137.52Q398 139.17 398 141.67Q398 144.39 397.49 146.23Q396.97 148.08 395.5 149.19Q394.03 150.3 391.24 150.78Q388.46 151.27 383.92 151.27H374.49Q370.35 151.27 367.55 150.9Q364.75 150.54 363.08 149.44Q361.42 148.34 360.69 146.16Q359.97 143.99 359.97 140.36H363.84Q363.84 143.2 364.3 144.75Q364.77 146.3 365.93 146.98Q367.09 147.66 369.17 147.79Q371.26 147.92 374.49 147.92H383.72Q387.33 147.92 389.43 147.69Q391.53 147.45 392.54 146.8Q393.54 146.14 393.84 144.91Q394.13 143.68 394.13 141.67Z"/>
 
-  <!-- top bar of the app: logo + connection dot + clock -->
-  <text x="606" y="80" fill="url(#wordmark)" font-size="11" font-weight="700" letter-spacing="2">COMPASS</text>
-  <rect x="683" y="70" width="1.5" height="12" fill="#f97316"/>
-  <text x="690" y="80" fill="#94a3b8" font-size="7.5" font-weight="600" letter-spacing="1.2">FLEET CONTROL</text>
-  <circle cx="1100" cy="77" r="3.5" fill="#22c55e"/>
-  <text x="1108" y="80" fill="#94a3b8" font-size="8.5">12 ms</text>
-  <path d="M592 90H1164" stroke="#1e293b" stroke-width="1"/>
-
-  <!-- sidebar -->
-  <rect x="540" y="62" width="52" height="264" fill="#0f172a"/>
-  <g fill="#334155">
-    <rect x="556" y="100" width="20" height="20" rx="5"/>
-    <rect x="556" y="160" width="20" height="20" rx="5"/>
-    <rect x="556" y="190" width="20" height="20" rx="5"/>
-    <rect x="556" y="220" width="20" height="20" rx="5"/>
-    <rect x="556" y="250" width="20" height="20" rx="5"/>
+  <rect x="423" y="112" width="4.5" height="47" rx="2.25" fill="#f97316"/>
+  <g fill="#bed0d6" font-size="15" font-weight="600" letter-spacing="2.6">
+    <text x="446" y="132">FLEET</text>
+    <text x="446" y="153">CONTROL</text>
   </g>
-  <rect x="556" y="130" width="20" height="20" rx="5" fill="#1d4ed8"/>
-
-  <!-- live map -->
-  <rect x="604" y="100" width="330" height="214" rx="8" fill="#0f1b2d" stroke="#1e293b"/>
-  <rect x="604" y="100" width="330" height="214" rx="8" fill="url(#mapgrid)"/>
-  <g stroke="#a0c4e8" stroke-opacity="0.3" stroke-width="3" stroke-linecap="round" fill="none">
-    <path d="M640 140H900M640 210H900M640 280H900"/>
-    <path d="M640 140V280M770 140V280M900 140V280"/>
+  <text x="58" y="202" font-size="27" fill="#c6d8df">Manage your robot fleet</text>
+  <g transform="translate(58 279)" fill="#b1c6ce" font-size="16">
+    <path d="M0 0h25" fill="none" stroke="#b4ed72" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="13" r="3.5" fill="#b4ed72"/>
+    <text x="39" y="6">Cleared to cross</text>
+    <rect x="191" y="-8" width="18" height="16" rx="4" fill="#342e2a" stroke="#ffc38e" stroke-width="1.5"/>
+    <path d="M198-3v6m4-6v6" fill="none" stroke="#ffc38e" stroke-width="1.8" stroke-linecap="round"/>
+    <text x="220" y="6">Waiting</text>
   </g>
-  <path d="M705 210H900V150" fill="none" stroke="#63b3ed" stroke-width="3.5" stroke-linejoin="round"/>
-  <g fill="#1e293b" stroke="#a0c4e8" stroke-width="1.5">
-    <circle cx="640" cy="140" r="4"/><circle cx="705" cy="140" r="4"/><circle cx="770" cy="140" r="4"/>
-    <circle cx="835" cy="140" r="4"/><circle cx="900" cy="140" r="4"/>
-    <circle cx="640" cy="210" r="4"/><circle cx="705" cy="210" r="4"/><circle cx="770" cy="210" r="4"/>
-    <circle cx="835" cy="210" r="4"/><circle cx="900" cy="210" r="4"/>
-    <circle cx="640" cy="280" r="4"/><circle cx="705" cy="280" r="4"/><circle cx="770" cy="280" r="4"/>
-    <circle cx="835" cy="280" r="4"/><circle cx="900" cy="280" r="4"/>
-  </g>
-  <!-- stations: charger, pick -->
-  <rect x="619" y="262" width="16" height="16" rx="4" fill="#15803d"/>
-  <path d="M628 264L623 271H627L626 276L631 269H627Z" fill="#ffffff"/>
-  <rect x="905" y="122" width="16" height="16" rx="4" fill="#ea580c"/>
-  <rect x="909" y="127" width="8" height="6" rx="1" fill="#ffffff"/>
-
-  <g transform="translate(705 210)"><use href="#robot"/></g>
-  <g transform="translate(835 280) rotate(180)"><use href="#robot"/></g>
-  <g transform="translate(640 175) rotate(-90)"><use href="#robot"/></g>
-  <g font-size="9" font-weight="600" text-anchor="middle">
-    <text x="705" y="198" fill="#63b3ed">amr-01</text>
-    <text x="835" y="300" fill="#eab308">amr-02</text>
-    <text x="660" y="160" fill="#94a3b8" text-anchor="start">amr-03</text>
-  </g>
-
-  <!-- robots table -->
-  <rect x="946" y="100" width="206" height="214" rx="8" fill="#0f1b2d" stroke="#1e293b"/>
-  <text x="958" y="120" fill="#e2e8f0" font-size="11" font-weight="600">Robots</text>
-  <g font-size="9">
-    <g transform="translate(958 136)">
-      <text y="11" fill="#cbd5e1" font-family="monospace">amr-01</text>
-      <rect x="64" y="1" width="40" height="14" rx="7" fill="#22c55e"/>
-      <text x="84" y="11" fill="#ffffff" font-weight="600" text-anchor="middle">BUSY</text>
-      <rect x="114" y="5" width="60" height="5" rx="2.5" fill="#1e293b"/>
-      <rect x="114" y="5" width="48" height="5" rx="2.5" fill="#22c55e"/>
+  <!-- Self-contained still of the entry warehouse. External SVG assets do not load in every README viewer. -->
+  <g transform="translate(17 19)">
+    <polygon points="560.8,169.6 868.3,295.6 868.3,300.6 560.8,174.6" fill="#334B55"/>
+    <polygon points="1134.8,186.4 868.3,295.6 868.3,300.6 1134.8,191.4" fill="#1C303B"/>
+    <polygon points="827.3,60.4 1134.8,186.4 868.3,295.6 560.8,169.6" fill="#263D49"/>
+    <polyline points="827.3,60.4 560.8,169.6" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="847.8,68.8 581.3,178.0" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="868.3,77.2 601.8,186.4" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="888.8,85.6 622.3,194.8" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="909.3,94.0 642.8,203.2" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="929.8,102.4 663.3,211.6" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="950.3,110.8 683.8,220.0" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="970.8,119.2 704.3,228.4" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="991.3,127.6 724.8,236.8" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1011.8,136.0 745.3,245.2" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1032.3,144.4 765.8,253.6" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1052.8,152.8 786.3,262.0" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1073.3,161.2 806.8,270.4" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1093.8,169.6 827.3,278.8" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1114.3,178.0 847.8,287.2" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1134.8,186.4 868.3,295.6" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="827.3,60.4 1134.8,186.4" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="806.8,68.8 1114.3,194.8" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="786.3,77.2 1093.8,203.2" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="765.8,85.6 1073.3,211.6" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="745.3,94.0 1052.8,220.0" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="724.8,102.4 1032.3,228.4" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="704.3,110.8 1011.8,236.8" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="683.8,119.2 991.3,245.2" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="663.3,127.6 970.8,253.6" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="642.8,136.0 950.3,262.0" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="622.3,144.4 929.8,270.4" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="601.8,152.8 909.3,278.8" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="581.3,161.2 888.8,287.2" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="560.8,169.6 868.3,295.6" fill="none" stroke="#364C58" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <defs>
+      <g id="ce-shuttle" stroke-linejoin="round">
+        <path d="M-21-1-6-7.2 21 3.9 6 10.1Z" fill="#10171f" opacity=".65"/>
+        <g transform="matrix(.9 .369 0 1 9 -7.4)">
+          <circle r="4.2" fill="#10171f" stroke="#59727e" stroke-width="1"/>
+        </g>
+        <path d="M-20-10.3-20-8.6 4 1.2 8 1.2 20-3.7 20 1.3 8 6.2 4 6.2-20-3.6Z" fill="#172831"/>
+        <path d="M8 1.2 20-3.7V1.3L8 6.2Z" fill="#10171f"/>
+        <path d="M-20-10.3-8-15.2H-4L20-5.4V-3.7L8 1.2H4L-20-8.6Z" fill="#233b49" stroke="#8aa4ae" stroke-width="1.15"/>
+        <path d="M-12.8-10.4 6.2-2.6M-7.5-12.6 11.5-4.8" fill="none" stroke="#58717e" stroke-width="1.05"/>
+        <g transform="matrix(.9 .369 0 1 -9 .1)">
+          <circle r="4.2" fill="#10171f" stroke="#77909a" stroke-width="1.05"/>
+          <circle r="1.55" fill="#526c79"/>
+        </g>
+        <path d="m11 2 5.9-2.4" fill="none" stroke="#b4ed72" stroke-width="1.65" stroke-linecap="round"/>
+      </g>
+      <g id="ce-hold-symbol">
+        <rect x="-8" y="-32.5" width="16" height="14" rx="4" fill="#342e2a" stroke="#ffc38e" stroke-width="1.25"/>
+        <path d="M-2.1-28.2v5.4m4.2-5.4v5.4" fill="none" stroke="#ffc38e" stroke-width="1.7" stroke-linecap="round"/>
+      </g>
+    </defs>
+    <g transform="translate(865 205)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M-165-67.65 106 43.46M87-35.67-99 40.59" stroke="#88b4c7" stroke-width="2" opacity=".78"/>
+      <g fill="#263d49" stroke="#a5c3cd" stroke-width="1.35">
+        <ellipse cx="-165" cy="-67.65" rx="3.3" ry="1.8"/>
+        <ellipse cx="106" cy="43.46" rx="3.3" ry="1.8"/>
+        <ellipse cx="87" cy="-35.67" rx="3.3" ry="1.8"/>
+        <ellipse cx="-99" cy="40.59" rx="3.3" ry="1.8"/>
+      </g>
+      <path d="M-33 0 0-13.53 33 0 0 13.53Z" fill="#b4ed72" fill-opacity=".10" stroke="#a6ba9f" stroke-opacity=".68" stroke-width="1"/>
+      <g class="ce-reservation" stroke="#b4ed72">
+        <path d="M-44-18.04 44 18.04" stroke-width="9" opacity=".14"/>
+        <path d="M-44-18.04 44 18.04" stroke-width="3.3"/>
+      </g>
+      <path class="ce-stop-east" d="M-34-5.74-14-13.94" stroke="#ffc38e" stroke-width="3.2" visibility="hidden"/>
+      <path class="ce-stop-west" d="M14-13.94 34-5.74" stroke="#ffc38e" stroke-width="3.2"/>
     </g>
-    <g transform="translate(958 164)">
-      <text y="11" fill="#cbd5e1" font-family="monospace">amr-02</text>
-      <rect x="64" y="1" width="62" height="14" rx="7" fill="#eab308"/>
-      <text x="95" y="11" fill="#ffffff" font-weight="600" text-anchor="middle">CHARGING</text>
-      <rect x="132" y="5" width="42" height="5" rx="2.5" fill="#1e293b"/>
-      <rect x="132" y="5" width="12" height="5" rx="2.5" fill="#ef4444"/>
+    <polygon points="778.1,86.6 866.2,122.7 866.2,125.2 778.1,89.1" fill="#344D60"/>
+    <polygon points="888.8,113.5 866.2,122.7 866.2,125.2 888.8,116.0" fill="#263D50"/>
+    <polygon points="800.6,77.4 888.8,113.5 866.2,122.7 778.1,86.6" fill="#668497"/>
+    <polygon points="784.2,74.3 806.8,83.5 806.8,96.7 784.2,87.5" fill="#B88054"/>
+    <polygon points="825.2,75.9 806.8,83.5 806.8,96.7 825.2,89.1" fill="#895C41"/>
+    <polygon points="802.7,66.7 825.2,75.9 806.8,83.5 784.2,74.3" fill="#ECB57F"/>
+    <polygon points="792.5,77.1 796.5,78.8 796.5,79.3 792.5,77.6" fill="#F4D3A4"/>
+    <polygon points="815.0,71.2 796.5,78.8 796.5,79.3 815.0,71.7" fill="#F4D3A4"/>
+    <polygon points="810.9,69.6 815.0,71.2 796.5,78.8 792.5,77.1" fill="#F4D3A4"/>
+    <polygon points="813.0,86.0 835.5,95.3 835.5,108.5 813.0,99.2" fill="#B88054"/>
+    <polygon points="854.0,87.7 835.5,95.3 835.5,108.5 854.0,100.9" fill="#895C41"/>
+    <polygon points="831.4,78.5 854.0,87.7 835.5,95.3 813.0,86.0" fill="#ECB57F"/>
+    <polygon points="821.1,88.9 825.2,90.6 825.2,91.1 821.1,89.4" fill="#F4D3A4"/>
+    <polygon points="843.7,83.0 825.2,90.6 825.2,91.1 843.7,83.5" fill="#F4D3A4"/>
+    <polygon points="839.6,81.3 843.7,83.0 825.2,90.6 821.1,88.9" fill="#F4D3A4"/>
+    <polygon points="841.6,97.8 864.2,107.0 864.2,120.2 841.6,111.0" fill="#B88054"/>
+    <polygon points="882.6,99.5 864.2,107.0 864.2,120.2 882.6,112.7" fill="#895C41"/>
+    <polygon points="860.1,90.2 882.6,99.5 864.2,107.0 841.6,97.8" fill="#ECB57F"/>
+    <polygon points="849.9,100.6 854.0,102.3 854.0,102.8 849.9,101.1" fill="#F4D3A4"/>
+    <polygon points="872.4,94.8 854.0,102.3 854.0,102.8 872.4,95.3" fill="#F4D3A4"/>
+    <polygon points="868.3,93.1 872.4,94.8 854.0,102.3 849.9,100.6" fill="#F4D3A4"/>
+    <polygon points="778.1,65.2 866.2,101.3 866.2,103.8 778.1,67.6" fill="#344D60"/>
+    <polygon points="888.8,92.0 866.2,101.3 866.2,103.8 888.8,94.5" fill="#263D50"/>
+    <polygon points="800.6,55.9 888.8,92.0 866.2,101.3 778.1,65.2" fill="#668497"/>
+    <polygon points="784.2,52.8 806.8,62.0 806.8,75.2 784.2,66.0" fill="#B88054"/>
+    <polygon points="825.2,54.5 806.8,62.0 806.8,75.2 825.2,67.7" fill="#895C41"/>
+    <polygon points="802.7,45.2 825.2,54.5 806.8,62.0 784.2,52.8" fill="#ECB57F"/>
+    <polygon points="792.5,55.7 796.5,57.4 796.5,57.8 792.5,56.2" fill="#F4D3A4"/>
+    <polygon points="815.0,49.8 796.5,57.4 796.5,57.8 815.0,50.3" fill="#F4D3A4"/>
+    <polygon points="810.9,48.1 815.0,49.8 796.5,57.4 792.5,55.7" fill="#F4D3A4"/>
+    <polygon points="813.0,64.6 835.5,73.8 835.5,87.0 813.0,77.8" fill="#B88054"/>
+    <polygon points="854.0,66.2 835.5,73.8 835.5,87.0 854.0,79.4" fill="#895C41"/>
+    <polygon points="831.4,57.0 854.0,66.2 835.5,73.8 813.0,64.6" fill="#ECB57F"/>
+    <polygon points="821.1,67.4 825.2,69.1 825.2,69.6 821.1,67.9" fill="#F4D3A4"/>
+    <polygon points="843.7,61.6 825.2,69.1 825.2,69.6 843.7,62.0" fill="#F4D3A4"/>
+    <polygon points="839.6,59.9 843.7,61.6 825.2,69.1 821.1,67.4" fill="#F4D3A4"/>
+    <polygon points="841.6,76.3 864.2,85.6 864.2,98.8 841.6,89.5" fill="#B88054"/>
+    <polygon points="882.6,78.0 864.2,85.6 864.2,98.8 882.6,91.2" fill="#895C41"/>
+    <polygon points="860.1,68.8 882.6,78.0 864.2,85.6 841.6,76.3" fill="#ECB57F"/>
+    <polygon points="849.9,79.2 854.0,80.9 854.0,81.4 849.9,79.7" fill="#F4D3A4"/>
+    <polygon points="872.4,73.3 854.0,80.9 854.0,81.4 872.4,73.8" fill="#F4D3A4"/>
+    <polygon points="868.3,71.6 872.4,73.3 854.0,80.9 849.9,79.2" fill="#F4D3A4"/>
+    <polygon points="778.1,43.7 866.2,79.8 866.2,82.3 778.1,46.2" fill="#344D60"/>
+    <polygon points="888.8,70.6 866.2,79.8 866.2,82.3 888.8,73.1" fill="#263D50"/>
+    <polygon points="800.6,34.5 888.8,70.6 866.2,79.8 778.1,43.7" fill="#668497"/>
+    <polygon points="784.2,31.4 806.8,40.6 806.8,53.8 784.2,44.6" fill="#B88054"/>
+    <polygon points="825.2,33.0 806.8,40.6 806.8,53.8 825.2,46.2" fill="#895C41"/>
+    <polygon points="802.7,23.8 825.2,33.0 806.8,40.6 784.2,31.4" fill="#ECB57F"/>
+    <polygon points="792.5,34.2 796.5,35.9 796.5,36.4 792.5,34.7" fill="#F4D3A4"/>
+    <polygon points="815.0,28.3 796.5,35.9 796.5,36.4 815.0,28.8" fill="#F4D3A4"/>
+    <polygon points="810.9,26.7 815.0,28.3 796.5,35.9 792.5,34.2" fill="#F4D3A4"/>
+    <polygon points="813.0,43.1 835.5,52.4 835.5,65.6 813.0,56.3" fill="#B88054"/>
+    <polygon points="854.0,44.8 835.5,52.4 835.5,65.6 854.0,58.0" fill="#895C41"/>
+    <polygon points="831.4,35.6 854.0,44.8 835.5,52.4 813.0,43.1" fill="#ECB57F"/>
+    <polygon points="821.1,46.0 825.2,47.7 825.2,48.2 821.1,46.5" fill="#F4D3A4"/>
+    <polygon points="843.7,40.1 825.2,47.7 825.2,48.2 843.7,40.6" fill="#F4D3A4"/>
+    <polygon points="839.6,38.4 843.7,40.1 825.2,47.7 821.1,46.0" fill="#F4D3A4"/>
+    <polygon points="841.6,54.9 864.2,64.1 864.2,77.3 841.6,68.1" fill="#B88054"/>
+    <polygon points="882.6,56.6 864.2,64.1 864.2,77.3 882.6,69.8" fill="#895C41"/>
+    <polygon points="860.1,47.3 882.6,56.6 864.2,64.1 841.6,54.9" fill="#ECB57F"/>
+    <polygon points="849.9,57.7 854.0,59.4 854.0,59.9 849.9,58.2" fill="#F4D3A4"/>
+    <polygon points="872.4,51.9 854.0,59.4 854.0,59.9 872.4,52.4" fill="#F4D3A4"/>
+    <polygon points="868.3,50.2 872.4,51.9 854.0,59.4 849.9,57.7" fill="#F4D3A4"/>
+    <polygon points="799.0,31.0 800.6,31.7 800.6,86.1 799.0,85.5" fill="#344D60"/>
+    <polygon points="802.3,31.0 800.6,31.7 800.6,86.1 802.3,85.5" fill="#263D50"/>
+    <polygon points="800.6,30.4 802.3,31.0 800.6,31.7 799.0,31.0" fill="#668497"/>
+    <polygon points="776.5,40.3 778.1,40.9 778.1,95.4 776.5,94.7" fill="#344D60"/>
+    <polygon points="779.7,40.3 778.1,40.9 778.1,95.4 779.7,94.7" fill="#263D50"/>
+    <polygon points="778.1,39.6 779.7,40.3 778.1,40.9 776.5,40.3" fill="#668497"/>
+    <polygon points="844.1,49.5 845.8,50.2 845.8,104.6 844.1,104.0" fill="#344D60"/>
+    <polygon points="847.4,49.5 845.8,50.2 845.8,104.6 847.4,104.0" fill="#263D50"/>
+    <polygon points="845.8,48.8 847.4,49.5 845.8,50.2 844.1,49.5" fill="#668497"/>
+    <polygon points="821.6,58.7 823.2,59.4 823.2,113.9 821.6,113.2" fill="#344D60"/>
+    <polygon points="824.8,58.7 823.2,59.4 823.2,113.9 824.8,113.2" fill="#263D50"/>
+    <polygon points="823.2,58.1 824.8,58.7 823.2,59.4 821.6,58.7" fill="#668497"/>
+    <polygon points="887.2,67.1 888.8,67.8 888.8,122.3 887.2,121.6" fill="#344D60"/>
+    <polygon points="890.4,67.1 888.8,67.8 888.8,122.3 890.4,121.6" fill="#263D50"/>
+    <polygon points="888.8,66.5 890.4,67.1 888.8,67.8 887.2,67.1" fill="#668497"/>
+    <polygon points="864.6,76.4 866.2,77.1 866.2,131.5 864.6,130.8" fill="#344D60"/>
+    <polygon points="867.9,76.4 866.2,77.1 866.2,131.5 867.9,130.8" fill="#263D50"/>
+    <polygon points="866.2,75.7 867.9,76.4 866.2,77.1 864.6,76.4" fill="#668497"/>
+    <polygon points="720.7,110.1 808.9,146.3 808.9,148.7 720.7,112.6" fill="#344D60"/>
+    <polygon points="831.4,137.0 808.9,146.3 808.9,148.7 831.4,139.5" fill="#263D50"/>
+    <polygon points="743.2,100.9 831.4,137.0 808.9,146.3 720.7,110.1" fill="#668497"/>
+    <polygon points="726.9,97.8 749.4,107.0 749.4,120.2 726.9,111.0" fill="#B88054"/>
+    <polygon points="767.9,99.5 749.4,107.0 749.4,120.2 767.9,112.7" fill="#895C41"/>
+    <polygon points="745.3,90.2 767.9,99.5 749.4,107.0 726.9,97.8" fill="#ECB57F"/>
+    <polygon points="735.0,100.6 739.1,102.3 739.1,102.8 735.0,101.1" fill="#F4D3A4"/>
+    <polygon points="757.6,94.8 739.1,102.3 739.1,102.8 757.6,95.3" fill="#F4D3A4"/>
+    <polygon points="753.5,93.1 757.6,94.8 739.1,102.3 735.0,100.6" fill="#F4D3A4"/>
+    <polygon points="755.5,109.5 778.1,118.8 778.1,132.0 755.5,122.7" fill="#B88054"/>
+    <polygon points="796.5,111.2 778.1,118.8 778.1,132.0 796.5,124.4" fill="#895C41"/>
+    <polygon points="774.0,102.0 796.5,111.2 778.1,118.8 755.5,109.5" fill="#ECB57F"/>
+    <polygon points="763.8,112.4 767.9,114.1 767.9,114.6 763.8,112.9" fill="#F4D3A4"/>
+    <polygon points="786.3,106.5 767.9,114.1 767.9,114.6 786.3,107.0" fill="#F4D3A4"/>
+    <polygon points="782.2,104.8 786.3,106.5 767.9,114.1 763.8,112.4" fill="#F4D3A4"/>
+    <polygon points="784.2,121.3 806.8,130.5 806.8,143.7 784.2,134.5" fill="#B88054"/>
+    <polygon points="825.2,123.0 806.8,130.5 806.8,143.7 825.2,136.2" fill="#895C41"/>
+    <polygon points="802.7,113.7 825.2,123.0 806.8,130.5 784.2,121.3" fill="#ECB57F"/>
+    <polygon points="792.5,124.2 796.5,125.8 796.5,126.3 792.5,124.7" fill="#F4D3A4"/>
+    <polygon points="815.0,118.3 796.5,125.8 796.5,126.3 815.0,118.8" fill="#F4D3A4"/>
+    <polygon points="810.9,116.6 815.0,118.3 796.5,125.8 792.5,124.2" fill="#F4D3A4"/>
+    <polygon points="720.7,88.7 808.9,124.8 808.9,127.3 720.7,91.2" fill="#344D60"/>
+    <polygon points="831.4,115.6 808.9,124.8 808.9,127.3 831.4,118.0" fill="#263D50"/>
+    <polygon points="743.2,79.4 831.4,115.6 808.9,124.8 720.7,88.7" fill="#668497"/>
+    <polygon points="726.9,76.3 749.4,85.6 749.4,98.8 726.9,89.5" fill="#B88054"/>
+    <polygon points="767.9,78.0 749.4,85.6 749.4,98.8 767.9,91.2" fill="#895C41"/>
+    <polygon points="745.3,68.8 767.9,78.0 749.4,85.6 726.9,76.3" fill="#ECB57F"/>
+    <polygon points="735.0,79.2 739.1,80.9 739.1,81.4 735.0,79.7" fill="#F4D3A4"/>
+    <polygon points="757.6,73.3 739.1,80.9 739.1,81.4 757.6,73.8" fill="#F4D3A4"/>
+    <polygon points="753.5,71.6 757.6,73.3 739.1,80.9 735.0,79.2" fill="#F4D3A4"/>
+    <polygon points="755.5,88.1 778.1,97.3 778.1,110.5 755.5,101.3" fill="#B88054"/>
+    <polygon points="796.5,89.8 778.1,97.3 778.1,110.5 796.5,103.0" fill="#895C41"/>
+    <polygon points="774.0,80.5 796.5,89.8 778.1,97.3 755.5,88.1" fill="#ECB57F"/>
+    <polygon points="763.8,91.0 767.9,92.6 767.9,93.1 763.8,91.4" fill="#F4D3A4"/>
+    <polygon points="786.3,85.1 767.9,92.6 767.9,93.1 786.3,85.6" fill="#F4D3A4"/>
+    <polygon points="782.2,83.4 786.3,85.1 767.9,92.6 763.8,91.0" fill="#F4D3A4"/>
+    <polygon points="784.2,99.8 806.8,109.1 806.8,122.3 784.2,113.0" fill="#B88054"/>
+    <polygon points="825.2,101.5 806.8,109.1 806.8,122.3 825.2,114.7" fill="#895C41"/>
+    <polygon points="802.7,92.3 825.2,101.5 806.8,109.1 784.2,99.8" fill="#ECB57F"/>
+    <polygon points="792.5,102.7 796.5,104.4 796.5,104.9 792.5,103.2" fill="#F4D3A4"/>
+    <polygon points="815.0,96.8 796.5,104.4 796.5,104.9 815.0,97.3" fill="#F4D3A4"/>
+    <polygon points="810.9,95.2 815.0,96.8 796.5,104.4 792.5,102.7" fill="#F4D3A4"/>
+    <polygon points="720.7,67.2 808.9,103.4 808.9,105.8 720.7,69.7" fill="#344D60"/>
+    <polygon points="831.4,94.1 808.9,103.4 808.9,105.8 831.4,96.6" fill="#263D50"/>
+    <polygon points="743.2,58.0 831.4,94.1 808.9,103.4 720.7,67.2" fill="#668497"/>
+    <polygon points="726.9,54.9 749.4,64.1 749.4,77.3 726.9,68.1" fill="#B88054"/>
+    <polygon points="767.9,56.6 749.4,64.1 749.4,77.3 767.9,69.8" fill="#895C41"/>
+    <polygon points="745.3,47.3 767.9,56.6 749.4,64.1 726.9,54.9" fill="#ECB57F"/>
+    <polygon points="735.0,57.7 739.1,59.4 739.1,59.9 735.0,58.2" fill="#F4D3A4"/>
+    <polygon points="757.6,51.9 739.1,59.4 739.1,59.9 757.6,52.4" fill="#F4D3A4"/>
+    <polygon points="753.5,50.2 757.6,51.9 739.1,59.4 735.0,57.7" fill="#F4D3A4"/>
+    <polygon points="755.5,66.6 778.1,75.9 778.1,89.1 755.5,79.8" fill="#B88054"/>
+    <polygon points="796.5,68.3 778.1,75.9 778.1,89.1 796.5,81.5" fill="#895C41"/>
+    <polygon points="774.0,59.1 796.5,68.3 778.1,75.9 755.5,66.6" fill="#ECB57F"/>
+    <polygon points="763.8,69.5 767.9,71.2 767.9,71.7 763.8,70.0" fill="#F4D3A4"/>
+    <polygon points="786.3,63.6 767.9,71.2 767.9,71.7 786.3,64.1" fill="#F4D3A4"/>
+    <polygon points="782.2,61.9 786.3,63.6 767.9,71.2 763.8,69.5" fill="#F4D3A4"/>
+    <polygon points="784.2,78.4 806.8,87.6 806.8,100.8 784.2,91.6" fill="#B88054"/>
+    <polygon points="825.2,80.1 806.8,87.6 806.8,100.8 825.2,93.3" fill="#895C41"/>
+    <polygon points="802.7,70.8 825.2,80.1 806.8,87.6 784.2,78.4" fill="#ECB57F"/>
+    <polygon points="792.5,81.3 796.5,82.9 796.5,83.4 792.5,81.8" fill="#F4D3A4"/>
+    <polygon points="815.0,75.4 796.5,82.9 796.5,83.4 815.0,75.9" fill="#F4D3A4"/>
+    <polygon points="810.9,73.7 815.0,75.4 796.5,82.9 792.5,81.3" fill="#F4D3A4"/>
+    <polygon points="741.6,54.5 743.2,55.2 743.2,109.7 741.6,109.0" fill="#344D60"/>
+    <polygon points="744.9,54.5 743.2,55.2 743.2,109.7 744.9,109.0" fill="#263D50"/>
+    <polygon points="743.2,53.9 744.9,54.5 743.2,55.2 741.6,54.5" fill="#668497"/>
+    <polygon points="719.1,63.8 720.7,64.5 720.7,118.9 719.1,118.2" fill="#344D60"/>
+    <polygon points="722.3,63.8 720.7,64.5 720.7,118.9 722.3,118.2" fill="#263D50"/>
+    <polygon points="720.7,63.1 722.3,63.8 720.7,64.5 719.1,63.8" fill="#668497"/>
+    <polygon points="786.7,73.0 788.4,73.7 788.4,128.1 786.7,127.5" fill="#344D60"/>
+    <polygon points="790.0,73.0 788.4,73.7 788.4,128.1 790.0,127.5" fill="#263D50"/>
+    <polygon points="788.4,72.4 790.0,73.0 788.4,73.7 786.7,73.0" fill="#668497"/>
+    <polygon points="764.2,82.3 765.8,82.9 765.8,137.4 764.2,136.7" fill="#344D60"/>
+    <polygon points="767.4,82.3 765.8,82.9 765.8,137.4 767.4,136.7" fill="#263D50"/>
+    <polygon points="765.8,81.6 767.4,82.3 765.8,82.9 764.2,82.3" fill="#668497"/>
+    <polygon points="829.8,90.7 831.4,91.3 831.4,145.8 829.8,145.1" fill="#344D60"/>
+    <polygon points="833.0,90.7 831.4,91.3 831.4,145.8 833.0,145.1" fill="#263D50"/>
+    <polygon points="831.4,90.0 833.0,90.7 831.4,91.3 829.8,90.7" fill="#668497"/>
+    <polygon points="807.2,99.9 808.9,100.6 808.9,155.0 807.2,154.4" fill="#344D60"/>
+    <polygon points="810.5,99.9 808.9,100.6 808.9,155.0 810.5,154.4" fill="#263D50"/>
+    <polygon points="808.9,99.2 810.5,99.9 808.9,100.6 807.2,99.9" fill="#668497"/>
+    <polygon points="993.4,152.3 997.5,154.0 997.5,170.5 993.4,168.8" fill="#344D60"/>
+    <polygon points="1022.0,143.9 997.5,154.0 997.5,170.5 1022.0,160.4" fill="#263D50"/>
+    <polygon points="1018.0,142.2 1022.0,143.9 997.5,154.0 993.4,152.3" fill="#668497"/>
+    <polygon points="1052.8,176.7 1056.9,178.3 1056.9,194.8 1052.8,193.2" fill="#344D60"/>
+    <polygon points="1081.5,168.3 1056.9,178.3 1056.9,194.8 1081.5,184.8" fill="#263D50"/>
+    <polygon points="1077.4,166.6 1081.5,168.3 1056.9,178.3 1052.8,176.7" fill="#668497"/>
+    <polygon points="979.0,144.8 1069.2,181.8 1069.2,186.7 979.0,149.8" fill="#344D60"/>
+    <polygon points="1100.0,169.2 1069.2,181.8 1069.2,186.7 1100.0,174.1" fill="#263D50"/>
+    <polygon points="1009.8,132.2 1100.0,169.2 1069.2,181.8 979.0,144.8" fill="#668497"/>
+    <polyline points="1011.8,134.3 985.1,145.2" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1018.0,136.8 991.3,147.7" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1024.1,139.3 997.5,150.2" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1030.2,141.8 1003.6,152.7" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1036.4,144.3 1009.8,155.3" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1042.5,146.9 1015.9,157.8" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1048.7,149.4 1022.0,160.3" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1054.8,151.9 1028.2,162.8" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1061.0,154.4 1034.3,165.3" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1067.2,156.9 1040.5,167.9" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1073.3,159.5 1046.7,170.4" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1079.5,162.0 1052.8,172.9" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1085.6,164.5 1059.0,175.4" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="1091.8,167.0 1065.1,177.9" fill="none" stroke="#9BB4BF" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polygon points="995.4,135.8 1011.8,142.5 1011.8,150.7 995.4,144.0" fill="#6999AD"/>
+    <polygon points="1028.2,135.8 1011.8,142.5 1011.8,150.7 1028.2,144.0" fill="#477489"/>
+    <polygon points="1011.8,129.0 1028.2,135.8 1011.8,142.5 995.4,135.8" fill="#ABD8EF"/>
+    <polygon points="1040.5,154.2 1056.9,161.0 1056.9,169.2 1040.5,162.5" fill="#6999AD"/>
+    <polygon points="1073.3,154.2 1056.9,161.0 1056.9,169.2 1073.3,162.5" fill="#477489"/>
+    <polygon points="1056.9,147.5 1073.3,154.2 1056.9,161.0 1040.5,154.2" fill="#ABD8EF"/>
+    <polygon points="974.9,198.3 1001.5,209.2 1001.5,215.8 974.9,204.9" fill="#344D60"/>
+    <polygon points="1026.2,199.2 1001.5,209.2 1001.5,215.8 1026.2,205.8" fill="#263D50"/>
+    <polygon points="999.5,188.2 1026.2,199.2 1001.5,209.2 974.9,198.3" fill="#668497"/>
+    <polyline points="999.5,198.3 999.5,183.5 974.9,156.9 1007.7,135.1 1009.8,137.5" fill="none" stroke="#453B3A" stroke-width="11" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <polyline points="999.5,198.3 999.5,183.5 974.9,156.9 1007.7,135.1 1009.8,137.5" fill="none" stroke="#FFAA69" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="none"/>
+    <circle cx="999.5" cy="183.47" r="4" fill="#273744" stroke="#FFC38E" stroke-width="2"/>
+    <circle cx="974.9" cy="156.95" r="4" fill="#273744" stroke="#FFC38E" stroke-width="2"/>
+    <circle cx="1007.7" cy="135.14" r="4" fill="#273744" stroke="#FFC38E" stroke-width="2"/>
+    <g class="ce-fleet">
+      <g class="ce-amr" data-amr="03" transform="translate(764.56 163.82)">
+        <use href="#ce-shuttle" xlink:href="#ce-shuttle"/>
+        <use class="ce-hold" href="#ce-hold-symbol" xlink:href="#ce-hold-symbol" visibility="hidden"/>
+      </g>
+      <g class="ce-amr" data-amr="02" transform="translate(908.00 187.37)">
+        <use href="#ce-shuttle" xlink:href="#ce-shuttle" transform="scale(-1 1)"/>
+        <use class="ce-hold" href="#ce-hold-symbol" xlink:href="#ce-hold-symbol" visibility="visible"/>
+      </g>
+      <g class="ce-amr" data-amr="01" transform="translate(867.25 205.92)">
+        <use href="#ce-shuttle" xlink:href="#ce-shuttle"/>
+        <g class="ce-cargo" stroke-linejoin="round">
+          <path d="M-13-18.5 2-12.35V-1.85L-13-8Z" fill="#b88054"/>
+          <path d="M2-12.35 13-16.86V-6.36L2-1.85Z" fill="#895c41"/>
+          <path d="M-13-18.5-2-23.01 13-16.86 2-12.35Z" fill="#ecb57f"/>
+          <path d="m-7.1-16.08 11-4.51 2.8 1.15-11 4.51Z" fill="#f4d3a4"/>
+          <path d="m-7.1-16.08 2.8 1.15v4.3l-2.8-1.15Z" fill="#dbae80"/>
+        </g>
+      </g>
     </g>
-    <g transform="translate(958 192)">
-      <text y="11" fill="#cbd5e1" font-family="monospace">amr-03</text>
-      <rect x="64" y="1" width="66" height="14" rx="7" fill="#64748b"/>
-      <text x="97" y="11" fill="#ffffff" font-weight="600" text-anchor="middle">NOT_READY</text>
-    </g>
-    <text x="1022" y="224" fill="#94a3b8" font-size="8">not localized</text>
-    <g transform="translate(958 236)">
-      <text y="11" fill="#cbd5e1" font-family="monospace">amr-04</text>
-      <rect x="64" y="1" width="52" height="14" rx="7" fill="#334155"/>
-      <text x="90" y="11" fill="#cbd5e1" font-weight="600" text-anchor="middle">OFFLINE</text>
-    </g>
-  </g>
-  <rect x="958" y="276" width="92" height="22" rx="6" fill="#1d4ed8"/>
-  <text x="1004" y="291" fill="#ffffff" font-size="9.5" font-weight="600" text-anchor="middle">+ Register robot</text>
-
-  <!-- ============================ title ============================ -->
-  <g id="brand">
-    <text x="56" y="64" fill="url(#wordmark)" font-size="24" font-weight="700" letter-spacing="4.5">COMPASS</text>
-    <rect x="219" y="42" width="3" height="26" rx="1.5" fill="#f97316"/>
-    <g fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="2.2">
-      <text x="232" y="53">FLEET</text>
-      <text x="232" y="67">CONTROL</text>
-    </g>
-  </g>
-  <text x="56" y="140" fill="#ffffff" font-size="50" font-weight="700">Fleet UI</text>
-  <text x="58" y="182" fill="#a0c4e8" font-size="21">web UI of the fms: robots, live map,</text>
-  <text x="58" y="210" fill="#a0c4e8" font-size="21">map editor, missions and alarms</text>
-  <g font-size="14" font-weight="600" text-anchor="middle">
-    <rect x="58" y="236" width="70" height="28" rx="14" fill="#4fd1c5" fill-opacity="0.15" stroke="#4fd1c5"/>
-    <text x="93" y="255" fill="#4fd1c5">Vue 3</text>
-    <rect x="138" y="236" width="64" height="28" rx="14" fill="#63b3ed" fill-opacity="0.15" stroke="#63b3ed"/>
-    <text x="170" y="255" fill="#63b3ed">Vite</text>
-    <rect x="212" y="236" width="92" height="28" rx="14" fill="#a0c4e8" fill-opacity="0.15" stroke="#a0c4e8"/>
-    <text x="258" y="255" fill="#a0c4e8">naive-ui</text>
-    <rect x="314" y="236" width="72" height="28" rx="14" fill="#f6ad55" fill-opacity="0.15" stroke="#f6ad55"/>
-    <text x="350" y="255" fill="#f6ad55">MQTT</text>
   </g>
 </svg>
