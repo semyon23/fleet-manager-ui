@@ -92,7 +92,7 @@ function setDirectionDeg(deg) {
             :key="t.value"
             :class="[
               'flex items-center gap-1.5 rounded border px-2 py-1 text-left text-[11px] transition',
-              zone.type === t.value ? 'border-slate-800 dark:border-brand-500 bg-slate-800 dark:bg-brand-700 text-white' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800',
+              zone.type === t.value ? 'border-(--ui-primary) bg-(--ui-primary) text-(color:--ui-on-primary)' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800',
             ]"
             :title="t.hint"
             @click="setType(t.value)"
@@ -103,7 +103,7 @@ function setDirectionDeg(deg) {
         </div>
         <p class="mt-1.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
           {{ meta.hint }}
-          <span class="text-slate-400 dark:text-slate-500">
+          <span class="text-(color:--ui-muted)">
             {{ meta.category === 'contour' ? 'Counts when any part of the robot is inside.' : 'Counts when the robot center is inside.' }}
           </span>
         </p>
@@ -121,12 +121,12 @@ function setDirectionDeg(deg) {
           <button
             v-for="b in ZONE_RELEASE_LOSS"
             :key="b"
-            :class="['flex-1 rounded border px-2 py-1 text-[11px]', zone.releaseLossBehavior === b ? 'border-slate-800 dark:border-brand-500 bg-slate-800 dark:bg-brand-700 text-white' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800']"
+            :class="['flex-1 rounded border px-2 py-1 text-[11px]', zone.releaseLossBehavior === b ? 'border-(--ui-primary) bg-(--ui-primary) text-(color:--ui-on-primary)' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800']"
             :title="RELEASE_LOSS_HINTS[b]"
             @click="update({ releaseLossBehavior: b })"
           >{{ b.charAt(0) + b.slice(1).toLowerCase() }}</button>
         </div>
-        <span class="text-[11px] text-slate-400 dark:text-slate-500">{{ RELEASE_LOSS_HINTS[zone.releaseLossBehavior] }}</span>
+        <span class="text-[11px] text-(color:--ui-muted)">{{ RELEASE_LOSS_HINTS[zone.releaseLossBehavior] }}</span>
       </div>
 
       <label v-if="zone.type === 'PRIORITY'" class="flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
@@ -160,12 +160,12 @@ function setDirectionDeg(deg) {
               :key="l"
               :class="['flex-1 rounded border px-2 py-1 text-[11px]',
                        (zone.type === 'DIRECTED' ? zone.directedLimitation : zone.bidirectedLimitation) === l
-                         ? 'border-slate-800 dark:border-brand-500 bg-slate-800 dark:bg-brand-700 text-white' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800']"
+                         ? 'border-(--ui-primary) bg-(--ui-primary) text-(color:--ui-on-primary)' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800']"
               :title="LIMITATION_HINTS[l]"
               @click="update(zone.type === 'DIRECTED' ? { directedLimitation: l } : { bidirectedLimitation: l })"
             >{{ l.charAt(0) + l.slice(1).toLowerCase() }}</button>
           </div>
-          <span class="text-[11px] text-slate-400 dark:text-slate-500">
+          <span class="text-[11px] text-(color:--ui-muted)">
             {{ LIMITATION_HINTS[zone.type === 'DIRECTED' ? zone.directedLimitation : zone.bidirectedLimitation] }}
           </span>
         </div>
@@ -190,20 +190,20 @@ function setDirectionDeg(deg) {
       <div>
         <div class="mb-1 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
           <span>Vertices ({{ zone.vertices.length }})</span>
-          <span class="font-mono text-[10px]" :class="isValidShape ? 'text-slate-400 dark:text-slate-500' : 'text-red-600'">
+          <span class="font-mono text-[10px]" :class="isValidShape ? 'text-(color:--ui-muted)' : 'text-red-600'">
             {{ isValidShape ? `${areaM2.toFixed(2)} m²` : 'edges intersect' }}
           </span>
         </div>
         <div class="max-h-48 space-y-1 overflow-y-auto">
           <div v-for="(p, i) in verticesWorld" :key="i" class="flex items-center gap-1">
-            <span class="w-4 text-right font-mono text-[10px] text-slate-400 dark:text-slate-500">{{ i + 1 }}</span>
+            <span class="w-4 text-right font-mono text-[10px] text-(color:--ui-muted)">{{ i + 1 }}</span>
             <NInputNumber :value="Number(p.x.toFixed(3))" size="tiny" :step="0.1" :show-button="false" style="flex: 1"
                           @update:value="(v) => setVertex(i, 'x', v)">
-              <template #prefix><span class="text-[10px] text-slate-400 dark:text-slate-500">x</span></template>
+              <template #prefix><span class="text-[10px] text-(color:--ui-muted)">x</span></template>
             </NInputNumber>
             <NInputNumber :value="Number(p.y.toFixed(3))" size="tiny" :step="0.1" :show-button="false" style="flex: 1"
                           @update:value="(v) => setVertex(i, 'y', v)">
-              <template #prefix><span class="text-[10px] text-slate-400 dark:text-slate-500">y</span></template>
+              <template #prefix><span class="text-[10px] text-(color:--ui-muted)">y</span></template>
             </NInputNumber>
             <button
               class="rounded px-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-30"
@@ -213,11 +213,11 @@ function setDirectionDeg(deg) {
             >×</button>
           </div>
         </div>
-        <p class="mt-1 text-[10px] text-slate-400 dark:text-slate-500">Drag corners on the map. Click a midpoint to add a corner.</p>
+        <p class="mt-1 text-[10px] text-(color:--ui-muted)">Drag corners on the map. Click a midpoint to add a corner.</p>
       </div>
 
       <div class="mt-2 flex gap-2">
-        <button class="flex-1 rounded bg-brand-800 py-2 text-sm text-white hover:bg-brand-900" @click="emit('save')">Save</button>
+        <button class="flex-1 rounded py-2 text-sm bg-(--ui-primary) text-(color:--ui-on-primary) hover:bg-(--ui-primary-hover)" @click="emit('save')">Save</button>
         <button class="rounded border border-red-300 dark:border-red-800 px-3 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40" @click="emit('delete')">Delete</button>
       </div>
     </div>

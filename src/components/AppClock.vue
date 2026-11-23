@@ -15,7 +15,7 @@ const date = computed(() =>
 <template>
   <!-- Время устройства, на котором открыт UI -->
   <div class="flex flex-col items-end font-mono leading-tight tabular-nums">
-    <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ time }}</span>
-    <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ date }}</span>
+    <span class="text-sm font-semibold text-(color:--ui-text)">{{ time }}</span>
+    <span class="text-[11px] text-(color:--ui-muted)">{{ date }}</span>
   </div>
 </template>

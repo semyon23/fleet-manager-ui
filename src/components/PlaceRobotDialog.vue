@@ -105,10 +105,10 @@ async function submit() {
         Map
         <NSelect v-model:value="mapId" :options="mapOptions" placeholder="No maps in fms" class="mt-1" />
       </label>
-      <div v-if="robot?.mapId && robot.mapId !== mapId" class="-mt-2 text-xs text-amber-600">
+      <div v-if="robot?.mapId && robot.mapId !== mapId" class="-mt-2 text-xs text-amber-800 dark:text-amber-300">
         The robot reports map {{ robot.mapId }}: the robot must have this map too.
       </div>
-      <div v-if="map?.dirty" class="-mt-2 text-xs text-amber-600">
+      <div v-if="map?.dirty" class="-mt-2 text-xs text-amber-800 dark:text-amber-300">
         This map has unsaved changes: fms uses the saved version.
       </div>
 
@@ -119,11 +119,11 @@ async function submit() {
       </label>
 
       <label class="text-sm text-slate-600 dark:text-slate-400">
-        Heading, ° <span class="text-slate-400 text-xs">(optional: the node's heading, otherwise the current one)</span>
+        Heading, ° <span class="text-(color:--ui-muted) text-xs">(optional: the node's heading, otherwise the current one)</span>
         <NInputNumber v-model:value="headingDeg" :min="-180" :max="180" clearable placeholder="auto" class="mt-1" />
       </label>
 
-      <div v-if="error" class="text-sm text-rose-600">{{ error }}</div>
+      <div v-if="error" class="text-sm text-rose-700 dark:text-rose-300">{{ error }}</div>
     </div>
 
     <template #footer>

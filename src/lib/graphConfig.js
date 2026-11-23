@@ -46,10 +46,11 @@ export const initialConfigs = {
       ...shape,
       color: WAYPOINT.colorSelect,
     },
+    focusring: { color: WAYPOINT.colorSelect },
     label: {
       visible: true,
       fontSize: 10,
-      color: '#374151',
+      color: 'var(--ui-text)',
       direction: 'north',
       margin: 6,
       background: { visible: false },
@@ -72,7 +73,13 @@ export const initialConfigs = {
       color: EDGE.colorSelect,
       width: EDGE.widthHover,
     },
+    summarized: {
+      label: { color: 'var(--ui-text)' },
+      shape: { color: 'var(--ui-surface)', strokeColor: EDGE.color },
+      stroke: { color: EDGE.color },
+    },
     label: {
+      color: 'var(--ui-text)',
       fontSize: 10,
       visible: false,
     },

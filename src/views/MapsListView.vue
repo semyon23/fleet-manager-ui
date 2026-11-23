@@ -151,7 +151,7 @@ async function del(row) {
 }
 
 const columns = [
-  { title: 'ID', key: 'id', render: (r) => h('span', { class: 'font-mono text-xs text-brand-800' }, r.id) },
+  { title: 'ID', key: 'id', render: (r) => h('span', { class: 'font-mono text-xs text-(color:--ui-muted)' }, r.id) },
   {
     title: 'Name',
     key: 'name',
@@ -159,7 +159,7 @@ const columns = [
       h(
         'a',
         {
-          class: 'cursor-pointer font-medium text-brand-700 hover:text-brand-900 hover:underline',
+          class: 'cursor-pointer font-medium text-(color:--ui-link) hover:underline',
           onClick: () => router.push({ name: 'map-editor', params: { id: r.id } }),
         },
         r.name
@@ -168,17 +168,17 @@ const columns = [
   {
     title: 'Size',
     key: 'size',
-    render: (r) => h('span', { class: 'font-mono text-xs text-slate-600' }, `${r.width} × ${r.height} px`),
+    render: (r) => h('span', { class: 'font-mono text-xs text-(color:--ui-muted)' }, `${r.width} × ${r.height} px`),
   },
   {
     title: 'Resolution',
     key: 'res',
-    render: (r) => h('span', { class: 'font-mono text-xs text-slate-600' }, `${r.meta.resolution} m/px`),
+    render: (r) => h('span', { class: 'font-mono text-xs text-(color:--ui-muted)' }, `${r.meta.resolution} m/px`),
   },
   {
     title: 'Version',
     key: 'version',
-    render: (r) => h('span', { class: 'flex items-center gap-1 font-mono text-xs text-slate-600' }, [
+    render: (r) => h('span', { class: 'flex items-center gap-1 font-mono text-xs text-(color:--ui-muted)' }, [
       `v${r.version}`,
       r.dirty ? h(NTag, { size: 'tiny', type: 'warning' }, { default: () => 'unsaved' }) : null,
     ]),
@@ -189,12 +189,12 @@ const columns = [
     render: (r) =>
       r.assignedRobots?.length
         ? h('div', { class: 'flex gap-1' }, r.assignedRobots.map((id) => h(NTag, { size: 'tiny' }, { default: () => id })))
-        : h('span', { class: 'text-xs text-slate-400' }, '—'),
+        : h('span', { class: 'text-xs text-(color:--ui-muted)' }, '—'),
   },
   {
     title: 'Updated',
     key: 'updatedAt',
-    render: (r) => h('span', { class: 'font-mono text-xs text-slate-500' }, (r.updatedAt || '').slice(0, 16).replace('T', ' ')),
+    render: (r) => h('span', { class: 'font-mono text-xs text-(color:--ui-muted)' }, (r.updatedAt || '').slice(0, 16).replace('T', ' ')),
   },
   {
     title: 'Actions',
@@ -209,17 +209,17 @@ const columns = [
 </script>
 
 <template>
-  <NCard title="Maps" size="small" class="!bg-white dark:!bg-slate-900">
+  <NCard title="Maps" size="small">
     <template #header-extra>
       <NButton type="primary" size="small" @click="showModal = true">+ New map</NButton>
     </template>
 
-    <div v-if="!store.maps.length" class="grid place-items-center rounded border-2 border-dashed border-slate-200 py-12 text-center">
+    <div v-if="!store.maps.length" class="grid place-items-center rounded border-2 border-dashed border-(--ui-border) py-12 text-center">
       <div>
         <div class="text-4xl">✎</div>
-        <div class="mt-2 text-sm text-slate-500">No maps yet. Upload a ROS 2 Nav2 map (.pgm + .yaml)…</div>
+        <div class="mt-2 text-sm text-(color:--ui-muted)">No maps yet. Upload a ROS 2 Nav2 map (.pgm + .yaml)…</div>
         <NButton type="primary" class="mt-4" @click="showModal = true">+ Upload first map</NButton>
-        <div class="my-4 text-xs uppercase tracking-wider text-slate-400">or try a sample</div>
+        <div class="my-4 text-xs uppercase tracking-wider text-(color:--ui-muted)">or try a sample</div>
         <div class="flex justify-center gap-2">
           <NButton
             v-for="s in SAMPLES"
@@ -245,8 +245,8 @@ const columns = [
       :segmented="{ content: 'soft' }"
     >
       <div class="flex flex-col gap-4">
-        <div class="rounded bg-brand-50 p-3">
-          <div class="text-xs uppercase tracking-wider text-brand-800">Quick start — try a sample</div>
+        <div class="rounded bg-(--ui-raised) p-3">
+          <div class="text-xs uppercase tracking-wider text-(color:--ui-text)">Quick start — try a sample</div>
           <div class="mt-2 flex gap-2">
             <NButton
               v-for="s in SAMPLES"
@@ -262,26 +262,26 @@ const columns = [
           </div>
         </div>
 
-        <div class="flex items-center gap-3 text-xs text-slate-400">
-          <div class="h-px flex-1 bg-slate-200" />
+        <div class="flex items-center gap-3 text-xs text-(color:--ui-muted)">
+          <div class="h-px flex-1 bg-(--ui-border)" />
           OR UPLOAD YOUR OWN
-          <div class="h-px flex-1 bg-slate-200" />
+          <div class="h-px flex-1 bg-(--ui-border)" />
         </div>
 
-        <label class="text-sm text-slate-600">
+        <label class="text-sm text-(color:--ui-muted)">
           Map name
           <NInput v-model:value="mapName" placeholder="Warehouse — Floor 1" class="mt-1" />
         </label>
 
-        <label class="text-sm text-slate-600">
-          Map ID <span class="text-xs text-slate-400">(optional)</span>
+        <label class="text-sm text-(color:--ui-muted)">
+          Map ID <span class="text-xs text-(color:--ui-muted)">(optional)</span>
           <NInput v-model:value="mapId" placeholder="map_1" class="mt-1" />
-          <span class="mt-1 block text-xs text-slate-400">
+          <span class="mt-1 block text-xs text-(color:--ui-muted)">
             The mapId robots use for this map (map_id in the robot settings). Empty — fms generates one.
           </span>
         </label>
 
-        <label class="text-sm text-slate-600">
+        <label class="text-sm text-(color:--ui-muted)">
           Map image (.pgm)
           <NUpload
             :max="1"
@@ -295,7 +295,7 @@ const columns = [
           </NUpload>
         </label>
 
-        <label class="text-sm text-slate-600">
+        <label class="text-sm text-(color:--ui-muted)">
           Map metadata (.yaml)
           <NUpload
             :max="1"
@@ -309,7 +309,7 @@ const columns = [
           </NUpload>
         </label>
 
-        <div class="rounded bg-slate-50 p-3 text-xs text-slate-600">
+        <div class="rounded bg-(--ui-canvas) p-3 text-xs text-(color:--ui-muted)">
           Files are parsed in the browser; the map is saved in fms (in mock mode — in this browser).
           Map ID also applies to the samples above.
         </div>

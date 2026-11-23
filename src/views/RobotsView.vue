@@ -2,11 +2,12 @@
 import { ref, computed, h } from 'vue'
 import { useRobotsStore } from '../stores/robots'
 import {
-  NCard, NDataTable, NTag, NButton, NModal, NInput, NSelect, NSwitch, NPopconfirm,
+  NCard, NDataTable, NButton, NModal, NInput, NSelect, NSwitch, NPopconfirm,
   NDrawer, NDrawerContent, NEmpty, NTooltip, useMessage,
 } from 'naive-ui'
+import FleetStatusTag from '../components/FleetStatusTag.vue'
 import RobotIcon from '../components/RobotIcon.vue'
-import { AVAILABILITY_OPTIONS, availabilityOf } from '../lib/availability'
+import { AVAILABILITY_OPTIONS, availabilityOf, batteryColor } from '../lib/availability'
 import * as api from '../api'
 import { subscribeRobot, unsubscribeRobot } from '../composables/useRobotMqtt'
 import PlaceRobotDialog from '../components/PlaceRobotDialog.vue'
@@ -90,7 +91,7 @@ async function setPaused(robot, paused) {
 function availabilityTag(r) {
   const meta = availabilityOf(r)
   const reasons = r.availability?.reasons || []
-  const tag = h(NTag, { color: { color: meta.color, textColor: 'white' }, size: 'small' }, { default: () => meta.label })
+  const tag = h(FleetStatusTag, { color: meta.color, size: 'small' }, { default: () => meta.label })
   if (!reasons.length) return tag
   // Причины — в подсказке; рядом число, чтобы было видно, что подсказка есть
   return h(NTooltip, null, {
@@ -107,7 +108,7 @@ function batteryBar(r) {
     h('div', { class: 'h-1.5 flex-1 rounded bg-slate-200 dark:bg-slate-700 overflow-hidden' }, [
       h('div', {
         class: 'h-full',
-        style: `width: ${r.battery}%; background: ${r.battery < 20 ? '#ef4444' : r.battery < 50 ? '#eab308' : '#22c55e'}`,
+        style: `width: ${r.battery}%; background: ${batteryColor(r.battery)}`,
       }),
     ]),
     h('span', { class: 'font-mono text-xs w-10 text-right' }, `${r.charging ? '⚡' : ''}${r.battery}%`),
@@ -125,10 +126,10 @@ const columns = [
     title: 'ID', key: 'id', sorter: 'default',
     render: (r) => h('div', { class: 'flex flex-col' }, [
       h('button', {
-        class: 'font-mono text-left text-brand-800 dark:text-brand-300 hover:underline',
+        class: 'font-mono text-left text-(color:--ui-link) hover:underline',
         onClick: (e) => { e.stopPropagation(); openDrawer(r.id) },
       }, r.id),
-      r.name && r.name !== r.id ? h('span', { class: 'text-xs text-slate-500' }, r.name) : null,
+      r.name && r.name !== r.id ? h('span', { class: 'text-xs text-(color:--ui-muted)' }, r.name) : null,
     ]),
   },
   { title: 'Robot', key: 'model', render: (r) => h('span', { class: 'font-mono text-xs' }, r.model) },
@@ -138,7 +139,7 @@ const columns = [
     render: availabilityTag,
   },
   { title: 'Battery', key: 'battery', sorter: (a, b) => a.battery - b.battery, render: batteryBar },
-  { title: 'Mission', key: 'mission', render: (r) => h('span', { class: 'font-mono text-xs text-slate-500' }, r.mission || '—') },
+  { title: 'Mission', key: 'mission', render: (r) => h('span', { class: 'font-mono text-xs text-(color:--ui-muted)' }, r.mission || '—') },
   {
     title: 'Actions', key: 'actions',
     render: (r) =>
@@ -214,7 +215,7 @@ async function submitRegister() {
 </script>
 
 <template>
-  <NCard title="Robots" size="small" class="!bg-white dark:!bg-slate-900">
+  <NCard title="Robots" size="small">
     <template #header-extra>
       <div class="flex items-center gap-3">
         <NSelect
@@ -231,8 +232,8 @@ async function submitRegister() {
           <span>Live (5s)</span>
           <NSwitch :value="store.pollingActive" size="small" @update:value="toggleLive" />
         </div>
-        <span v-if="store.lastPollError" class="text-xs text-rose-600 font-mono" :title="store.lastPollError">poll error</span>
-        <span v-else-if="store.lastPollAt" class="text-xs text-slate-400 font-mono">{{ store.lastPollAt.toLocaleTimeString() }}</span>
+        <span v-if="store.lastPollError" class="text-xs text-rose-700 dark:text-rose-300 font-mono" :title="store.lastPollError">poll error</span>
+        <span v-else-if="store.lastPollAt" class="text-xs text-(color:--ui-muted) font-mono">{{ store.lastPollAt.toLocaleTimeString() }}</span>
         <NButton type="primary" size="small" @click="openRegister">+ Register robot</NButton>
       </div>
     </template>
@@ -256,7 +257,7 @@ async function submitRegister() {
       :max-height="tableMaxHeight"
       :row-props="(row) => ({ style: 'cursor: pointer', onClick: () => openDrawer(row.id) })"
     />
-    <div v-if="store.robots.length && filteredRobots.length === 0" class="mt-3 text-center text-xs text-slate-500">
+    <div v-if="store.robots.length && filteredRobots.length === 0" class="mt-3 text-center text-xs text-(color:--ui-muted)">
       No robots match the current filter.
       <NButton size="tiny" tertiary @click="stateFilter = []">Clear filter</NButton>
     </div>
@@ -279,7 +280,7 @@ async function submitRegister() {
         </label>
 
         <label class="text-sm text-slate-600 dark:text-slate-400">
-          Name <span class="text-slate-400 text-xs">(optional, defaults to ID)</span>
+          Name <span class="text-(color:--ui-muted) text-xs">(optional, defaults to ID)</span>
           <NInput v-model:value="form.name" placeholder="AMR 01" class="mt-1" />
         </label>
 
@@ -320,62 +321,62 @@ async function submitRegister() {
           </div>
 
           <div>
-            <NTag :color="{ color: availabilityOf(selectedRobot).color, textColor: 'white' }">
+            <FleetStatusTag :color="availabilityOf(selectedRobot).color">
               {{ availabilityOf(selectedRobot).label }}
-            </NTag>
+            </FleetStatusTag>
             <ul v-if="selectedRobot.availability?.reasons?.length" class="mt-2 flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
               <li v-for="reason in selectedRobot.availability.reasons" :key="reason.code">• {{ reason.message }}</li>
             </ul>
           </div>
 
           <div class="grid grid-cols-2 gap-3 text-sm">
-            <div class="text-slate-500">Name</div>
+            <div class="text-(color:--ui-muted)">Name</div>
             <div>{{ selectedRobot.name }}</div>
 
-            <div class="text-slate-500">Manufacturer / serial</div>
+            <div class="text-(color:--ui-muted)">Manufacturer / serial</div>
             <div class="font-mono text-xs">{{ selectedRobot.model }}</div>
 
-            <div class="text-slate-500">Connection</div>
+            <div class="text-(color:--ui-muted)">Connection</div>
             <div class="font-mono text-xs">{{ selectedRobot.connection }}</div>
 
-            <div class="text-slate-500">Mode</div>
+            <div class="text-(color:--ui-muted)">Mode</div>
             <div class="font-mono text-xs">{{ selectedRobot.operatingMode || '—' }}</div>
 
-            <div class="text-slate-500">Battery</div>
+            <div class="text-(color:--ui-muted)">Battery</div>
             <div class="flex items-center gap-2">
               <div class="h-1.5 w-24 rounded bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <div
                   class="h-full"
-                  :style="`width: ${selectedRobot.battery}%; background: ${selectedRobot.battery < 20 ? '#ef4444' : selectedRobot.battery < 50 ? '#eab308' : '#22c55e'}`"
+                  :style="`width: ${selectedRobot.battery}%; background: ${batteryColor(selectedRobot.battery)}`"
                 ></div>
               </div>
               <span class="font-mono text-xs">{{ selectedRobot.charging ? '⚡ ' : '' }}{{ selectedRobot.battery }}%</span>
             </div>
 
-            <div class="text-slate-500">Last node</div>
+            <div class="text-(color:--ui-muted)">Last node</div>
             <div class="font-mono text-xs">{{ selectedRobot.lastNodeId || '—' }}</div>
 
-            <div class="text-slate-500">Position</div>
+            <div class="text-(color:--ui-muted)">Position</div>
             <div class="font-mono text-xs">
               {{ selectedRobot.x.toFixed(2) }}, {{ selectedRobot.y.toFixed(2) }} m · {{ ((selectedRobot.theta * 180) / Math.PI).toFixed(1) }}°
-              <span v-if="selectedRobot.mapId" class="text-slate-500">· {{ selectedRobot.mapId }}</span>
+              <span v-if="selectedRobot.mapId" class="text-(color:--ui-muted)">· {{ selectedRobot.mapId }}</span>
             </div>
 
-            <div class="text-slate-500">Mission</div>
+            <div class="text-(color:--ui-muted)">Mission</div>
             <div class="font-mono text-xs">{{ selectedRobot.mission || '—' }}</div>
 
-            <div class="text-slate-500">Last update</div>
+            <div class="text-(color:--ui-muted)">Last update</div>
             <div class="font-mono text-xs">{{ selectedRobot.lastStateAt ? new Date(selectedRobot.lastStateAt).toLocaleTimeString() : '—' }}</div>
           </div>
 
           <div v-if="selectedRobot.errors.length" class="flex flex-col gap-2">
-            <div class="text-sm text-slate-500">Robot errors</div>
+            <div class="text-sm text-(color:--ui-muted)">Robot errors</div>
             <div
               v-for="(err, i) in selectedRobot.errors"
               :key="i"
               class="rounded border border-slate-200 dark:border-slate-700 p-2 text-xs"
             >
-              <NTag size="tiny" :color="{ color: errorLevelColor[err.level] || '#64748b', textColor: 'white' }">{{ err.level }}</NTag>
+              <FleetStatusTag size="tiny" :color="errorLevelColor[err.level] || '#64748b'">{{ err.level }}</FleetStatusTag>
               <span class="ml-2 font-mono">{{ err.errorType }}</span>
               <div v-if="err.description" class="mt-1 text-slate-600 dark:text-slate-300">{{ err.description }}</div>
             </div>
@@ -412,11 +413,11 @@ async function submitRegister() {
           </div>
 
           <div>
-            <div class="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">Journal</div>
+            <div class="mb-1 text-xs font-medium uppercase tracking-wide text-(color:--ui-muted)">Journal</div>
             <JournalList :robot-id="selectedRobot.id" :limit="20" />
           </div>
         </div>
-        <div v-else class="text-sm text-slate-500">No robot selected.</div>
+        <div v-else class="text-sm text-(color:--ui-muted)">No robot selected.</div>
       </NDrawerContent>
     </NDrawer>
 

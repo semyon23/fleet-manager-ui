@@ -1,39 +1,5 @@
-/**
- * Единая палитра проекта. Использовать везде вместо hard-coded hex.
- *
- * Ссылки: цветовая семантика взята из HikVision MonitorClient
- * (Референсы/monitorclient/bin/MapBK/MapEle/) — green=charge/queue,
- * red=parking, purple=infrastructure, orange=warning.
- */
-
-// === Общая палитра проекта ===
-export const COLORS = {
-  brand: {
-    50:  '#eff6ff',
-    100: '#dbeafe',
-    500: '#3b82f6',
-    700: '#1d4ed8',
-    800: '#1e40af',
-    900: '#1e3a8a',
-  },
-  slate: {
-    50:  '#f8fafc',
-    100: '#f1f5f9',
-    200: '#e2e8f0',
-    300: '#cbd5e1',
-    400: '#94a3b8',
-    500: '#64748b',
-    600: '#475569',
-    700: '#334155',
-    900: '#0f172a',
-  },
-  accent: {
-    orange: '#f97316',
-    red:    '#dc2626',
-    green:  '#059669',
-    blue:   '#2563eb',
-  },
-}
+// Цвета объектов карты. Палитра оболочки задаётся в src/assets/main.css.
+// Типы станций сохраняют свои цвета в обеих темах.
 
 // === Станции: цвет + иконка по типу ===
 // Используется в Map Editor'е (#override-node) и Live Map.
@@ -55,22 +21,19 @@ export function stationIconFor(kind) {
 
 // === Ноды waypoint по умолчанию ===
 export const WAYPOINT = {
-  color:       '#475569',   // slate-600 — виден и на белом полу, и на сером препятствии
-  colorHover:  '#1e293b',
-  colorDark:   '#cbd5e1',   // slate-300
-  colorHoverDark: '#f1f5f9',
-  colorSelect: '#f97316',   // orange-500
-  radius:      5,
+  color: 'var(--ui-muted)',
+  colorHover: 'var(--ui-link)',
+  colorSelect: 'var(--ui-primary)',
+  radius: 5,
   strokeWidth: 1.5,
-  strokeColor: '#ffffff',
-  strokeColorDark: '#0f172a',
+  strokeColor: 'var(--ui-canvas)',
 }
 
 // === Edges ===
 export const EDGE = {
-  color:       '#9ca3af',
-  colorHover:  '#6b7280',
-  colorSelect: '#f97316',
+  color: 'var(--ui-muted)',
+  colorHover: 'var(--ui-link)',
+  colorSelect: 'var(--ui-primary)',
   width:       2,
   widthHover:  3,
   // Сплошная линия: пунктир начинается заново на каждом ребре,
@@ -81,10 +44,6 @@ export const EDGE = {
 
 // === Grid ===
 export const GRID = {
-  line:  { color: '#e5e7eb', width: 1, dasharray: 1 },
-  thick: { color: '#9ca3af', width: 1, dasharray: 0 },
-}
-export const GRID_DARK = {
-  line:  { color: '#1e293b', width: 1, dasharray: 1 },
-  thick: { color: '#475569', width: 1, dasharray: 0 },
+  line:  { color: 'color-mix(in srgb, var(--ui-border) 54%, var(--ui-canvas))', width: 1, dasharray: 1 },
+  thick: { color: 'var(--ui-border)', width: 1, dasharray: 0 },
 }

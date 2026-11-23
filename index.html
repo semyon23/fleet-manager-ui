@@ -27,11 +27,13 @@
       // Тема до первого кадра (та же логика, что в useTheme), чтобы заставка
       // и приложение не мигали белым в тёмной теме.
       ;(function () {
-        var mode = 'system'
+        var mode = 'dark'
         try {
-          mode = localStorage.getItem('fm.theme') || 'system'
+          mode = localStorage.getItem('fm.theme') || 'dark'
         } catch (_) {}
-        var dark = mode === 'dark' || (mode !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)
+        var dark = mode === 'system'
+          ? !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          : mode !== 'light'
         document.documentElement.classList.toggle('dark', dark)
       })()
     </script>

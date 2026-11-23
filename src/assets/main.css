@@ -4,17 +4,29 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-brand-50: #f0f6ff;
-  --color-brand-100: #dbeafe;
-  --color-brand-200: #bfdbfe;
-  --color-brand-300: #93c5fd;
-  --color-brand-400: #60a5fa;
-  --color-brand-500: #3b82f6;
-  --color-brand-600: #2563eb;
-  --color-brand-700: #1d4ed8;
-  --color-brand-800: #1e40af;
-  --color-brand-900: #1e3a8a;
-  --color-brand-950: #0b1e4a;
+  --color-slate-50: #f2f6f6;
+  --color-slate-100: #e7eff0;
+  --color-slate-200: #d1dfe2;
+  --color-slate-300: #b3c8cf;
+  --color-slate-400: #92adb7;
+  --color-slate-500: #556f7b;
+  --color-slate-600: #506976;
+  --color-slate-700: #344e5b;
+  --color-slate-800: #233b49;
+  --color-slate-900: #172831;
+  --color-slate-950: #10171f;
+
+  --color-brand-50: #f1f8ea;
+  --color-brand-100: #dfefcf;
+  --color-brand-200: #cee9b0;
+  --color-brand-300: #c4f391;
+  --color-brand-400: #b4ed72;
+  --color-brand-500: #8dcb4f;
+  --color-brand-600: #598733;
+  --color-brand-700: #416721;
+  --color-brand-800: #36561e;
+  --color-brand-900: #2c4420;
+  --color-brand-950: #20331b;
 
   --color-status-idle: #94a3b8;
   --color-status-moving: #22c55e;
@@ -30,6 +42,42 @@
   --color-accent: #f97316;
 }
 
+/* Shared by Tailwind surfaces, Naive UI overlays and canvas charts. */
+:root {
+  color-scheme: light;
+  --ui-canvas: var(--color-slate-50);
+  --ui-surface: #ffffff;
+  --ui-raised: var(--color-slate-100);
+  --ui-hover: #e1ebed;
+  --ui-border: #bfd0d5;
+  --ui-text: var(--color-slate-900);
+  --ui-muted: var(--color-slate-600);
+  --ui-primary: var(--color-brand-700);
+  --ui-primary-hover: var(--color-brand-800);
+  --ui-primary-pressed: var(--color-brand-900);
+  --ui-on-primary: #ffffff;
+  --ui-link: #23638a;
+  --ui-wordmark-start: #1e3a8a;
+  --ui-wordmark-end: #2563eb;
+}
+:root.dark {
+  color-scheme: dark;
+  --ui-canvas: var(--color-slate-950);
+  --ui-surface: var(--color-slate-900);
+  --ui-raised: var(--color-slate-800);
+  --ui-hover: #2a4653;
+  --ui-border: #3b5663;
+  --ui-text: #eaf2f4;
+  --ui-muted: var(--color-slate-300);
+  --ui-primary: var(--color-brand-400);
+  --ui-primary-hover: var(--color-brand-300);
+  --ui-primary-pressed: var(--color-brand-500);
+  --ui-on-primary: #101c20;
+  --ui-link: #abd8ef;
+  --ui-wordmark-start: #bfdbfe;
+  --ui-wordmark-end: #60a5fa;
+}
+
 html,
 body,
 #app {
@@ -40,13 +88,9 @@ body,
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  background-color: #f8fafc; /* slate-50 — соответствует .bg-slate-50 в light */
-  color: #0f172a; /* slate-900 */
+  background-color: var(--ui-canvas);
+  color: var(--ui-text);
   transition: background-color 120ms linear, color 120ms linear;
-}
-.dark body {
-  background-color: #020617; /* slate-950 */
-  color: #e2e8f0; /* slate-200 */
 }
 
 @layer components {
@@ -56,12 +100,9 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.14em;
     line-height: 1;
-    background-image: linear-gradient(90deg, var(--color-brand-900), var(--color-brand-600));
+    background-image: linear-gradient(90deg, var(--ui-wordmark-start), var(--ui-wordmark-end));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-  }
-  .dark .wordmark {
-    background-image: linear-gradient(90deg, var(--color-brand-200), var(--color-brand-400));
   }
 }

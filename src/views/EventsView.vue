@@ -2,7 +2,8 @@
 // Events (контракт 8): вкладка Alarms — только то, что требует человека; Journal — всё, что произошло.
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NCard, NTabs, NTabPane, NTag, NButton, NEmpty, NPopconfirm, useMessage } from 'naive-ui'
+import { NCard, NTabs, NTabPane, NButton, NEmpty, NPopconfirm, useMessage } from 'naive-ui'
+import FleetStatusTag from '../components/FleetStatusTag.vue'
 import { useAlarmsStore } from '../stores/alarms'
 import { severityOf, statusOf } from '../lib/alarms'
 import JournalList from '../components/JournalList.vue'
@@ -59,13 +60,12 @@ function openMission(id) {
 </script>
 
 <template>
-  <NCard size="small" class="!bg-white dark:!bg-slate-900">
+  <NCard size="small">
     <NTabs v-model:value="tab" type="line" animated>
       <NTabPane name="alarms">
         <template #tab>
           Alarms
-          <span v-if="alarms.badge" class="ml-1.5 rounded px-1.5 font-mono text-[11px] text-white"
-                :style="{ background: alarms.badge.color }">{{ alarms.badge.count }}</span>
+          <FleetStatusTag v-if="alarms.badge" :color="alarms.badge.color" size="tiny" class="ml-1.5 font-mono">{{ alarms.badge.count }}</FleetStatusTag>
         </template>
 
         <div class="mb-3 flex flex-wrap items-center gap-1.5">
@@ -94,11 +94,11 @@ function openMission(id) {
                :class="a.active ? 'border-slate-300 dark:border-slate-600' : 'border-slate-200 opacity-75 dark:border-slate-800'"
                :style="{ borderLeft: `4px solid ${severityOf(a).color}`, borderRadius: 0 }">
             <div class="flex items-start gap-3">
-              <NTag size="small" :bordered="false" :color="{ color: severityOf(a).color, textColor: 'white' }">{{ severityOf(a).label }}</NTag>
+              <FleetStatusTag size="small" :color="severityOf(a).color">{{ severityOf(a).label }}</FleetStatusTag>
               <div class="min-w-0 flex-1">
                 <div class="font-medium">{{ a.title }}</div>
                 <div class="text-sm text-slate-600 dark:text-slate-300">{{ a.detail }}</div>
-                <div class="mt-1 flex flex-wrap gap-x-3 font-mono text-[11px] text-slate-500">
+                <div class="mt-1 flex flex-wrap gap-x-3 font-mono text-[11px] text-(color:--ui-muted)">
                   <span>{{ statusOf(a) }}</span>
                   <span v-if="a.robotId" class="text-brand-800 dark:text-brand-300">{{ a.robotId }}</span>
                   <span>since {{ when(a.createdAt) }}</span>

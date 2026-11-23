@@ -105,6 +105,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .entry {
+  --ui-wordmark-start: #bfdbfe;
+  --ui-wordmark-end: #60a5fa;
   display: flex;
   min-height: 100%;
   min-height: 100dvh;
@@ -142,7 +144,6 @@ onBeforeUnmount(() => {
 }
 .entry-title .wordmark {
   font-weight: 400;
-  background-image: linear-gradient(90deg, var(--color-brand-200), var(--color-brand-400));
 }
 .entry-divider {
   width: .13em;

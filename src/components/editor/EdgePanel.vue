@@ -96,7 +96,7 @@ const ORIENTATION_HINTS = {
               </select>
             </label>
           </div>
-          <p class="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{{ ORIENTATION_HINTS[edge.orientationType || 'TANGENTIAL'] }}</p>
+          <p class="mt-1 text-[11px] text-(color:--ui-muted)">{{ ORIENTATION_HINTS[edge.orientationType || 'TANGENTIAL'] }}</p>
           <label class="mt-1 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400" title="Omnidirectional robots only">
             Turn before entering the edge
             <NSwitch size="small" :value="!!edge.reachOrientationBeforeEntering"
@@ -153,7 +153,7 @@ const ORIENTATION_HINTS = {
       <ActionListEditor scope="edge" :actions="edge.actions || []" @update:actions="(v) => update({ actions: v })" />
 
       <div class="mt-2 flex gap-2">
-        <button class="flex-1 rounded bg-brand-800 py-2 text-sm text-white hover:bg-brand-900" @click="emit('save')">Save</button>
+        <button class="flex-1 rounded py-2 text-sm bg-(--ui-primary) text-(color:--ui-on-primary) hover:bg-(--ui-primary-hover)" @click="emit('save')">Save</button>
         <button class="rounded border border-red-300 dark:border-red-800 px-3 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40" @click="emit('delete')">Delete</button>
       </div>
     </div>

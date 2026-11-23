@@ -10,7 +10,7 @@ import { parseLif } from '../lib/importLif'
 import { validateMap } from '../lib/validateMap'
 import { graphConfigs } from '../lib/graphConfig'
 import * as api from '../api'
-import { STATION_KINDS, stationColorFor, stationIconFor, WAYPOINT, GRID_DARK } from '../lib/theme'
+import { STATION_KINDS, stationColorFor, stationIconFor } from '../lib/theme'
 import { useSequentialIds } from '../composables/useSequentialIds'
 import { useAxisTicks } from '../composables/useAxisTicks'
 import ActionListEditor from '../components/editor/ActionListEditor.vue'
@@ -642,26 +642,11 @@ const gridIntervalInLayout = computed(() => {
   return Math.max(0.5, gridInterval.value / res)
 })
 
-// Computed поверх reactive(initialConfigs) — точь-в-точь как эталон
-// NetworkGraph.vue:179 dynamicConfigs. Spread копия нужна чтобы v-network-graph
-// увидел смену prop и подхватил visibility/grid interval. reactive base
-// обеспечивает что normal.color-функция остаётся живой ссылкой.
-// Цвета, зависящие от темы: обводка узлов, подписи, сетка.
-const nodeStroke = computed(() => (isDark.value ? WAYPOINT.strokeColorDark : WAYPOINT.strokeColor))
-const nodeFill = computed(() => (isDark.value ? WAYPOINT.colorDark : WAYPOINT.color))
-const nodeFillHover = computed(() => (isDark.value ? WAYPOINT.colorHoverDark : WAYPOINT.colorHover))
 const dynamicConfig = computed(() => ({
   ...graphConfigs,
   node: {
     ...graphConfigs.node,
-    normal: { ...graphConfigs.node.normal, strokeColor: nodeStroke.value, color: (n) => n.color || nodeFill.value },
-    hover: { ...graphConfigs.node.hover, strokeColor: nodeStroke.value, color: (n) => n.color || nodeFillHover.value },
-    selected: { ...graphConfigs.node.selected, strokeColor: nodeStroke.value },
-    label: {
-      ...graphConfigs.node.label,
-      visible: showLabels.value,
-      color: isDark.value ? '#cbd5e1' : '#374151',
-    },
+    label: { ...graphConfigs.node.label, visible: showLabels.value },
   },
   edge: {
     ...graphConfigs.edge,
@@ -671,7 +656,6 @@ const dynamicConfig = computed(() => ({
     ...graphConfigs.view,
     grid: {
       ...graphConfigs.view.grid,
-      ...(isDark.value ? GRID_DARK : {}),
       visible: showGrid.value,
       interval: gridIntervalInLayout.value,
     },
@@ -1940,7 +1924,7 @@ const zoneToolHint = computed(() => {
           type="number" min="0.01" max="20" step="1"
           :value="nodesPerM"
           @change="nodesPerM = Math.min(20, Math.max(0.01, Number($event.target.value) || 1)); $event.target.value = nodesPerM"
-          class="w-14 rounded border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 font-mono text-[10px] focus:border-brand-800 focus:outline-none"
+          class="w-14 rounded border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 font-mono text-[10px] focus:border-(--ui-primary) focus:outline-none"
         />
         <span class="text-[10px] text-slate-500 dark:text-slate-400">per m</span>
       </label>
@@ -1950,7 +1934,7 @@ const zoneToolHint = computed(() => {
           type="number" min="0" max="1000" step="0.5" placeholder="free"
           :value="turnRadius ?? ''"
           @input="turnRadius = $event.target.value === '' ? null : Math.max(0, Number($event.target.value) || 0)"
-          class="w-14 rounded border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 font-mono text-[10px] focus:border-brand-800 focus:outline-none"
+          class="w-14 rounded border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 font-mono text-[10px] focus:border-(--ui-primary) focus:outline-none"
         />
         <span class="text-[10px] text-slate-500 dark:text-slate-400">m</span>
       </label>
@@ -1960,7 +1944,7 @@ const zoneToolHint = computed(() => {
           type="number" min="3" max="100" step="1" placeholder="step"
           :value="arcPoints ?? ''"
           @change="arcPoints = $event.target.value === '' ? null : Math.min(100, Math.max(3, Math.round(Number($event.target.value)) || 3))"
-          class="w-12 rounded border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 font-mono text-[10px] focus:border-brand-800 focus:outline-none"
+          class="w-12 rounded border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 font-mono text-[10px] focus:border-(--ui-primary) focus:outline-none"
         />
       </label>
 
@@ -2048,13 +2032,13 @@ const zoneToolHint = computed(() => {
 
       <div class="flex items-center gap-2 whitespace-nowrap text-xs text-slate-600 dark:text-slate-300" title="Grid step">
         Grid
-        <input type="range" min="0.1" max="10" step="0.1" v-model.number="gridInterval" class="w-16 accent-brand-800" />
+        <input type="range" min="0.1" max="10" step="0.1" v-model.number="gridInterval" class="w-16 accent-(--ui-primary)" />
         <input
           type="number"
           min="0.01" max="1000" step="0.1"
           :value="gridInterval"
           @input="gridInterval = Math.max(0.01, Number($event.target.value) || 0.01)"
-          class="w-14 rounded border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 font-mono text-[10px] text-slate-700 dark:text-slate-200 focus:border-brand-800 focus:outline-none"
+          class="w-14 rounded border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 font-mono text-[10px] text-slate-700 dark:text-slate-200 focus:border-(--ui-primary) focus:outline-none"
         />
         <span class="text-[10px] text-slate-500 dark:text-slate-400">m</span>
       </div>
@@ -2064,7 +2048,7 @@ const zoneToolHint = computed(() => {
       <button class="rounded border border-slate-200 dark:border-slate-700 px-3 py-1 text-xs hover:bg-slate-50 dark:hover:bg-slate-800" @click="showPreview = true">Preview JSON</button>
       <span class="whitespace-nowrap font-mono text-[10px] text-slate-500 dark:text-slate-400" title="Map version in fms">v{{ map.version }}</span>
       <span v-if="map.dirty" class="whitespace-nowrap text-xs text-amber-600 dark:text-amber-400">Unsaved changes</span>
-      <button class="rounded bg-brand-800 px-3 py-1 text-xs text-white hover:bg-brand-900" @click="saveToBackend">Save</button>
+      <button class="rounded px-3 py-1 text-xs bg-(--ui-primary) text-(color:--ui-on-primary) hover:bg-(--ui-primary-hover)" @click="saveToBackend">Save</button>
     </div>
 
     <!-- Main split: left list | center graph | right form -->
@@ -2076,7 +2060,7 @@ const zoneToolHint = computed(() => {
             v-model="search"
             type="search"
             placeholder="Search elements…"
-            class="w-full rounded border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-sm outline-none focus:border-brand-800"
+            class="w-full rounded border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-sm outline-none focus:border-(--ui-primary)"
           />
         </div>
         <div class="flex-1 overflow-y-auto p-3 text-sm">
@@ -2167,7 +2151,7 @@ const zoneToolHint = computed(() => {
       </aside>
 
       <!-- CENTER GRAPH -->
-      <main ref="mainRef" class="relative flex-1 overflow-hidden bg-white dark:bg-slate-900" @mousemove="onGraphMouseMove">
+      <main ref="mainRef" class="relative flex-1 overflow-hidden bg-(--ui-canvas)" @mousemove="onGraphMouseMove">
         <v-network-graph
           ref="graph"
           :nodes="nodes"
@@ -2232,7 +2216,7 @@ const zoneToolHint = computed(() => {
                   :x="z.center.x" :y="z.center.y + (z.arrow ? 14 / zoomLevel : 0) - (z.selected ? 20 / zoomLevel : 0)"
                   text-anchor="middle" dominant-baseline="middle"
                   :font-size="11 / zoomLevel" font-weight="600" font-family="system-ui, sans-serif"
-                  :fill="z.color" :stroke="isDark ? '#0f172a' : '#ffffff'" :stroke-width="3 / zoomLevel" paint-order="stroke"
+                  fill="var(--ui-text)" stroke="var(--ui-canvas)" :stroke-width="3 / zoomLevel" paint-order="stroke"
                 >{{ z.label }}</text>
               </g>
 
@@ -2244,7 +2228,7 @@ const zoneToolHint = computed(() => {
                   stroke="#f97316" :stroke-opacity="h.selected ? 0.9 : 0.5"
                   :stroke-width="1 / zoomLevel" :stroke-dasharray="`${3 / zoomLevel} ${2 / zoomLevel}`"
                 />
-                <g v-if="h.headingDeg !== null" :transform="`rotate(${h.headingDeg}) scale(${1 / zoomLevel})`" :fill="isDark ? '#e2e8f0' : '#0f172a'" :stroke="isDark ? '#e2e8f0' : '#0f172a'">
+                <g v-if="h.headingDeg !== null" :transform="`rotate(${h.headingDeg}) scale(${1 / zoomLevel})`" fill="var(--ui-text)" stroke="var(--ui-text)">
                   <line x1="0" y1="0" x2="18" y2="0" stroke-width="2" />
                   <path d="M 24 0 L 16 -4.5 L 16 4.5 Z" stroke="none" />
                 </g>
@@ -2275,7 +2259,7 @@ const zoneToolHint = computed(() => {
               <g v-if="pathPreview">
                 <polyline
                   v-if="pathPreview.polyline"
-                  :points="pathPreview.polyline" fill="none" stroke="#2563eb"
+                  :points="pathPreview.polyline" fill="none" stroke="var(--ui-link)"
                   :stroke-width="2 / zoomLevel" stroke-linecap="round" stroke-linejoin="round"
                   :stroke-dasharray="pathPreview.pending ? `${5 / zoomLevel} ${4 / zoomLevel}` : null"
                   :stroke-opacity="pathPreview.pending ? 0.6 : 0.9"
@@ -2283,16 +2267,16 @@ const zoneToolHint = computed(() => {
                 <circle
                   v-for="(p, i) in pathPreview.dots" :key="'pp' + i"
                   :cx="p.x" :cy="p.y" :r="3 / zoomLevel"
-                  fill="#2563eb" :stroke="isDark ? '#0f172a' : '#ffffff'" :stroke-width="1 / zoomLevel"
+                  fill="var(--ui-link)" stroke="var(--ui-canvas)" :stroke-width="1 / zoomLevel"
                 />
                 <circle
                   :cx="pathPreview.start.x" :cy="pathPreview.start.y" :r="5 / zoomLevel"
-                  fill="none" stroke="#2563eb" :stroke-width="2 / zoomLevel"
+                  fill="none" stroke="var(--ui-link)" :stroke-width="2 / zoomLevel"
                 />
                 <circle
                   v-if="pathPreview.anchor"
                   :cx="pathPreview.anchor.x" :cy="pathPreview.anchor.y" :r="5 / zoomLevel"
-                  fill="none" stroke="#2563eb" :stroke-width="2 / zoomLevel"
+                  fill="none" stroke="var(--ui-link)" :stroke-width="2 / zoomLevel"
                 />
               </g>
             </g>
@@ -2507,7 +2491,7 @@ const zoneToolHint = computed(() => {
                   >
                     {{ id }}
                   </NTag>
-                  <span v-if="!connectedNodes.length" class="text-[10px] text-slate-400 dark:text-slate-500">Nodes…</span>
+                  <span v-if="!connectedNodes.length" class="text-[10px] text-(color:--ui-muted)">Nodes…</span>
                 </div>
               </div>
               <div class="rounded border border-slate-200 dark:border-slate-700 p-2">
@@ -2565,13 +2549,13 @@ const zoneToolHint = computed(() => {
                   </NInputNumber>
                   <NButton size="small" type="primary" :disabled="!filletRadius" @click="roundSelectedCorner">Round</NButton>
                 </div>
-                <div class="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
+                <div class="mt-1 text-[10px] text-(color:--ui-muted)">
                   Turn {{ cornerInfo.deg }}° · max radius {{ cornerInfo.maxR.toFixed(2) }} m · {{ arcPoints ? `${arcPoints} nodes on the arc` : `${nodesPerM} nodes per m` }}
                 </div>
               </div>
               <ActionListEditor scope="node" :actions="selectedWaypoint.actions || []" @update:actions="updateWaypointActions" />
               <div class="mt-2 flex gap-2">
-                <button class="flex-1 rounded bg-brand-800 py-2 text-sm text-white hover:bg-brand-900" @click="saveToBackend">Save</button>
+                <button class="flex-1 rounded py-2 text-sm bg-(--ui-primary) text-(color:--ui-on-primary) hover:bg-(--ui-primary-hover)" @click="saveToBackend">Save</button>
                 <button class="rounded border border-red-300 dark:border-red-800 px-3 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40" @click="deleteSelected">Delete</button>
               </div>
             </div>
@@ -2596,9 +2580,9 @@ const zoneToolHint = computed(() => {
                     :key="k.value"
                     :class="[
                       'rounded border px-2 py-1 text-xs transition',
-                      selectedStation.kind === k.value ? 'border-slate-800 dark:border-brand-500 bg-slate-800 dark:bg-brand-700 text-white' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800',
+                      selectedStation.kind === k.value ? 'border-(--ui-primary) bg-(--ui-primary) text-(color:--ui-on-primary)' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800',
                     ]"
-                    :style="selectedStation.kind === k.value ? '' : `color: ${k.color}; border-color: ${k.color}`"
+                    :style="selectedStation.kind === k.value ? null : { borderColor: k.color }"
                     @click="updateStationField('kind', k.value)"
                   >{{ k.label }}</button>
                 </div>
@@ -2614,7 +2598,7 @@ const zoneToolHint = computed(() => {
                 </div>
               </div>
               <div class="mt-2 flex gap-2">
-                <button class="flex-1 rounded bg-brand-800 py-2 text-sm text-white hover:bg-brand-900" @click="saveToBackend">Save</button>
+                <button class="flex-1 rounded py-2 text-sm bg-(--ui-primary) text-(color:--ui-on-primary) hover:bg-(--ui-primary-hover)" @click="saveToBackend">Save</button>
                 <button class="rounded border border-red-300 dark:border-red-800 px-3 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40" @click="deleteSelected">Delete</button>
               </div>
             </div>
@@ -2629,7 +2613,7 @@ const zoneToolHint = computed(() => {
             @save="saveToBackend"
           />
 
-          <div v-else class="text-center text-xs text-slate-400 dark:text-slate-500 py-8">
+          <div v-else class="text-center text-xs text-(color:--ui-muted) py-8">
             <div class="mb-2 text-3xl">◯</div>
             Select a node, station, edge or zone to edit
           </div>
@@ -2728,15 +2712,15 @@ const zoneToolHint = computed(() => {
   width: 32px;
   height: 32px;
   border-radius: 4px;
-  color: #475569;
+  color: var(--ui-muted);
   transition: background 0.15s;
 }
-.tool-btn:hover:not(:disabled) {
-  background: #f1f5f9;
+.tool-btn:not(.active):hover:not(:disabled) {
+  background: var(--ui-raised);
 }
 .tool-btn.active {
-  background: #1e40af;
-  color: #ffffff;
+  background: var(--ui-primary);
+  color: var(--ui-on-primary);
 }
 .tool-btn:disabled {
   opacity: 0.35;
@@ -2748,18 +2732,16 @@ const zoneToolHint = computed(() => {
   justify-content: center;
   width: 28px;
   height: 28px;
-  color: #475569;
-  border-bottom: 1px solid #f1f5f9;
+  color: var(--ui-muted);
+  border-bottom: 1px solid var(--ui-border);
   transition: background 0.15s;
 }
 .zoom-btn:last-child { border-bottom: none; }
-.zoom-btn:hover { background: #f8fafc; }
-
-/* Тёмная тема: нативные select/input тоже тёмные */
-.dark .editor-root { color-scheme: dark; }
-.dark .tool-btn { color: #cbd5e1; }
-.dark .tool-btn:hover:not(:disabled) { background: #1e293b; }
-.dark .tool-btn.active { background: #2563eb; color: #ffffff; }
-.dark .zoom-btn { color: #cbd5e1; border-bottom-color: #1e293b; }
-.dark .zoom-btn:hover { background: #1e293b; }
+.zoom-btn:hover { background: var(--ui-raised); }
+:deep(.v-ng-text) {
+  paint-order: stroke;
+  stroke: var(--ui-canvas);
+  stroke-width: 2px;
+  stroke-linejoin: round;
+}
 </style>

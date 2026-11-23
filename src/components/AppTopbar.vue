@@ -7,6 +7,7 @@ import { useRobotsStore } from '../stores/robots'
 import { livePositionsStatus, LEVEL_COLORS } from '../lib/livePositions'
 import { useAlarmsStore } from '../stores/alarms'
 import AppClock from './AppClock.vue'
+import FleetStatusTag from './FleetStatusTag.vue'
 
 const route = useRoute()
 const title = computed(() => route.meta?.title || 'Fleet Manager')
@@ -45,27 +46,26 @@ const live = computed(() => livePositionsStatus({
 
 <template>
   <header
-    class="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 lg:px-6 dark:border-slate-800 dark:bg-slate-900"
+    class="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-(--ui-border) bg-(--ui-surface) px-4 lg:px-6"
   >
     <div class="flex min-w-0 items-center gap-4">
-      <h1 class="truncate text-lg font-semibold text-slate-900 dark:text-slate-100">{{ title }}</h1>
+      <h1 class="truncate text-lg font-semibold text-(color:--ui-text)">{{ title }}</h1>
     </div>
     <div class="flex items-center gap-3 lg:gap-4">
       <router-link
         to="/events"
-        class="flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-xs"
-        :class="alarms.badge ? 'text-white' : 'text-slate-400 hover:text-brand-800 dark:hover:text-brand-300'"
-        :style="alarms.badge ? { background: alarms.badge.color } : {}"
+        class="flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-xs text-(color:--ui-muted) hover:bg-(--ui-hover)"
         :title="alarmsTitle"
+        :aria-label="alarmsTitle"
       >
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
         </svg>
-        <span v-if="alarms.badge">{{ alarms.badge.count }}</span>
+        <FleetStatusTag v-if="alarms.badge" size="tiny" :color="alarms.badge.color">{{ alarms.badge.count }}</FleetStatusTag>
       </router-link>
       <span
         v-if="live.level !== 'off'"
-        class="flex cursor-help items-center gap-1.5 font-mono text-xs text-slate-500 dark:text-slate-400"
+        class="flex cursor-help items-center gap-1.5 font-mono text-xs text-(color:--ui-muted)"
         :title="live.hint"
       >
         <span class="inline-block h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: LEVEL_COLORS[live.level] }" />
@@ -73,7 +73,7 @@ const live = computed(() => livePositionsStatus({
       </span>
       <router-link
         to="/settings"
-        class="flex items-center gap-2 font-mono text-xs text-slate-500 hover:text-brand-800 dark:text-slate-400 dark:hover:text-brand-300"
+        class="flex items-center gap-2 font-mono text-xs text-(color:--ui-muted) hover:text-(color:--ui-link)"
         :title="healthTitle"
       >
         <span
@@ -89,7 +89,7 @@ const live = computed(() => livePositionsStatus({
         <span v-if="health.latencyMs.value != null" class="w-12">{{ health.latencyMs.value }} ms</span>
         <span v-else class="w-12">—</span>
       </router-link>
-      <AppClock class="border-l border-slate-200 pl-3 lg:pl-4 dark:border-slate-800" />
+      <AppClock class="border-l border-(--ui-border) pl-3 lg:pl-4" />
     </div>
   </header>
 </template>

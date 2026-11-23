@@ -1,7 +1,7 @@
 <script setup>
 import { useRobotsStore } from '../stores/robots'
 import { useMapsStore } from '../stores/maps'
-import { NCard, NTag, NSelect, NButton, NPopover, NCheckbox } from 'naive-ui'
+import { NCard, NSelect, NButton, NPopover, NCheckbox } from 'naive-ui'
 import { ref, shallowRef, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
 import { robotLook, footprintPx } from '../lib/robotLook'
 import { createLiveRoutePoller } from '../lib/liveRoutePolling'
@@ -13,6 +13,7 @@ import { worldToPixel } from '../lib/nav2meta'
 import { worldAngleToSvgDeg } from '../lib/geometry'
 import PlaceRobotDialog from '../components/PlaceRobotDialog.vue'
 import MapRobotShape from '../components/MapRobotShape.vue'
+import FleetStatusTag from '../components/FleetStatusTag.vue'
 
 const robots = useRobotsStore()
 const maps = useMapsStore()
@@ -47,6 +48,18 @@ const mapOptions = computed(() =>
 const selectedId = ref(null)
 const selected = computed(() => markers.value.find((m) => m.id === selectedId.value) || null)
 const hovered = ref(null)
+const detailsOpen = ref(false)
+const detailsToggle = ref(null)
+
+function selectRobot(id) {
+  selectedId.value = id
+  detailsOpen.value = true
+}
+
+function closeDetails() {
+  detailsOpen.value = false
+  detailsToggle.value.$el.focus()
+}
 
 // Размер окна карты на экране — следим, чтобы знать, сколько экранных пикселей в пикселе карты
 const svgBox = ref({ w: 0, h: 0 })
@@ -337,20 +350,20 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
 </script>
 
 <template>
-  <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
-    <NCard size="small" class="lg:col-span-3 !bg-white dark:!bg-slate-900">
+  <div class="grid grid-cols-1 gap-6" :class="{ 'lg:grid-cols-4': detailsOpen }">
+    <NCard size="small" :class="{ 'lg:col-span-3': detailsOpen }" header-style="flex-wrap: wrap; gap: 8px 12px">
       <template #header>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
           <span class="text-base font-semibold">Live Map</span>
           <NSelect
             v-if="mapOptions.length"
             :value="selectedMapId"
             :options="mapOptions"
             size="small"
-            style="width: 240px"
+            style="width: 240px; max-width: 100%"
             @update:value="pickMap"
           />
-          <router-link v-else to="/maps" class="text-xs text-brand-700 dark:text-brand-300 hover:underline">
+          <router-link v-else to="/maps" class="text-xs text-(color:--ui-link) hover:underline">
             No maps uploaded yet -> upload one
           </router-link>
           <span v-if="mapOptions.length && elsewhereCount" class="text-xs text-slate-500 dark:text-slate-400">
@@ -359,6 +372,11 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
         </div>
       </template>
       <template #header-extra>
+        <NButton ref="detailsToggle" size="small" tertiary class="mr-2" :type="detailsOpen ? 'primary' : 'default'"
+                 :aria-expanded="detailsOpen" aria-controls="live-map-robot-details" @click="detailsOpen = !detailsOpen">
+          Robot details
+          <span aria-hidden="true" class="ml-1">{{ detailsOpen ? '▴' : '▾' }}</span>
+        </NButton>
         <NPopover trigger="click" placement="bottom-end">
           <template #trigger>
             <NButton size="small" tertiary>Layers ▾</NButton>
@@ -367,14 +385,14 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
             <NCheckbox v-for="l in LAYERS" :key="l.key" v-model:checked="layers[l.key]" :disabled="l.disabled"
                        :title="l.hint">
               <span class="text-sm">{{ l.label }}</span>
-              <span v-if="l.hint" class="block text-[11px] text-slate-400">{{ l.hint }}</span>
+              <span v-if="l.hint" class="block text-[11px] text-(color:--ui-muted)">{{ l.hint }}</span>
             </NCheckbox>
           </div>
         </NPopover>
       </template>
 
       <div
-        class="relative overflow-hidden rounded border border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"
+        class="relative overflow-hidden rounded border border-(--ui-border) bg-(--ui-canvas)"
         style="height: calc(100vh - 11rem); min-height: 480px"
       >
         <svg
@@ -389,26 +407,22 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
           @mouseleave="onMouseLeave"
         >
           <defs>
-            <pattern id="grid" width="25" height="25" patternUnits="userSpaceOnUse">
-              <path d="M 25 0 L 0 0 0 25" fill="none" stroke="#cbd5e1" stroke-width="0.6" />
-            </pattern>
-            <pattern id="grid-dark" width="25" height="25" patternUnits="userSpaceOnUse">
-              <path d="M 25 0 L 0 0 0 25" fill="none" stroke="#334155" stroke-width="0.6" />
+            <pattern id="live-map-grid" width="25" height="25" patternUnits="userSpaceOnUse">
+              <path d="M 25 0 L 0 0 0 25" fill="none" stroke="var(--ui-border)" stroke-width="0.6" />
             </pattern>
           </defs>
 
-          <rect x="0" y="0" width="100%" height="100%" class="fill-[url(#grid)] dark:fill-[url(#grid-dark)]" />
+          <rect width="100%" height="100%" fill="url(#live-map-grid)" />
 
           <g :transform="zoomTransform">
           <template v-if="activeMap">
-            <!-- На светлой теме карту делаем контрастнее (opacity 0.85 vs 0.55) -->
             <image
               :href="activeMap.pgmDataUrl"
               :x="PADDING" :y="PADDING"
               :width="activeMap.width"
               :height="activeMap.height"
               preserveAspectRatio="none"
-              class="opacity-80 dark:opacity-60"
+              class="opacity-80 dark:opacity-60 dark:invert"
             />
           </template>
           <text v-else x="350" y="300" text-anchor="middle" font-size="14" class="fill-slate-400">
@@ -419,7 +433,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
             <g v-for="z in zones" :key="z.id">
               <polygon :points="z.points" :fill="z.color" fill-opacity="0.15" :stroke="z.color" stroke-opacity="0.8" stroke-width="1" />
               <text :x="z.cx" :y="z.cy" text-anchor="middle" dominant-baseline="middle" font-size="7"
-                    font-family="system-ui, sans-serif" font-weight="600" :fill="z.color" opacity="0.85">{{ z.label }}</text>
+                    font-family="system-ui, sans-serif" font-weight="600" class="map-label">{{ z.label }}</text>
             </g>
           </g>
 
@@ -447,7 +461,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
             <g v-for="wp in waypoints" :key="wp.id" :transform="`translate(${wp.x} ${wp.y})`">
               <circle r="1.8" stroke-width="0.8" class="fill-white stroke-slate-500 dark:fill-slate-800 dark:stroke-slate-300" />
               <text v-if="layers.nodeLabels" y="-6" text-anchor="middle" font-size="5" font-family="JetBrains Mono, monospace"
-                    class="fill-slate-600 dark:fill-slate-300" opacity="0.6">{{ wp.name }}</text>
+                    class="map-label">{{ wp.name }}</text>
             </g>
           </g>
 
@@ -462,7 +476,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
               <path v-else-if="st.icon === 'loading'" d="M0 -6 L 2.5 -1.8 L 0.7 -1.8 L 0.7 1.8 L 2.5 1.8 L 0 6 L -2.5 1.8 L -0.7 1.8 L -0.7 -1.8 L -2.5 -1.8 Z" />
               <polygon v-else-if="st.icon === 'star'" points="0,-6 1.7,-1.8 6,-1.8 2.5,0.7 3.9,4.9 0,2.4 -3.9,4.9 -2.5,0.7 -6,-1.8 -1.7,-1.8" />
             </g>
-            <text y="18" text-anchor="middle" font-size="7" font-family="JetBrains Mono, monospace" fill="#475569">
+            <text y="18" text-anchor="middle" font-size="7" font-family="JetBrains Mono, monospace" class="map-label">
               {{ st.name }}
             </text>
           </g>
@@ -483,7 +497,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
           </g>
 
           <!-- Путь робота: длинный (plannedPath) — пунктир, ближний (intermediatePath) — сплошная -->
-          <g v-for="p in robotPaths" :key="'path-' + p.id" fill="none" stroke="#0f766e" stroke-linecap="round"
+          <g v-for="p in robotPaths" :key="'path-' + p.id" fill="none" stroke="var(--ui-link)" stroke-linecap="round"
              stroke-linejoin="round" pointer-events="none">
             <polyline v-if="p.planned" :points="p.planned" :stroke-width="2 * perScreenPx"
                       :stroke-dasharray="`${6 * perScreenPx} ${4 * perScreenPx}`" opacity="0.8" />
@@ -499,9 +513,9 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
             tabindex="0"
             :aria-label="`${m.id} · ${m.stateLabel}`"
             :aria-pressed="m.id === selectedId"
-            @click.stop="selectedId = m.id"
-            @keydown.enter.prevent="selectedId = m.id"
-            @keydown.space.prevent="selectedId = m.id"
+            @click.stop="selectRobot(m.id)"
+            @keydown.enter.prevent="selectRobot(m.id)"
+            @keydown.space.prevent="selectRobot(m.id)"
             @mouseenter="hovered = m"
             @mouseleave="hovered = null"
           >
@@ -518,11 +532,11 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
             <g v-if="layers.robotLabels"
                :transform="`translate(0 ${robotSize.length * 0.75 + 10 * perScreenPx}) scale(${perScreenPx})`">
               <rect :x="-m.labelWidth / 2" y="-8" :width="m.labelWidth" height="16" rx="4"
-                    :class="m.id === selectedId ? 'fill-[#173f52] stroke-[#173f52] dark:fill-[#d5f2ff] dark:stroke-[#d5f2ff]'
-                                                : 'fill-white stroke-[#c1cfd3] dark:fill-[#22313c] dark:stroke-[#485d68]'" />
+                    :fill="m.id === selectedId ? 'var(--ui-link)' : 'var(--ui-surface)'"
+                    :stroke="m.id === selectedId ? 'var(--ui-link)' : 'var(--ui-border)'" />
               <circle :cx="8 - m.labelWidth / 2" cy="0" r="3.5" :fill="m.stroke" />
               <text :x="15 - m.labelWidth / 2" y="0" dominant-baseline="central" font-size="11"
-                    :class="m.id === selectedId ? 'fill-white dark:fill-[#132734]' : 'fill-[#192c38] dark:fill-[#e5edf2]'"
+                    :fill="m.id === selectedId ? 'var(--ui-canvas)' : 'var(--ui-text)'"
                     font-family="ui-monospace, monospace">{{ m.id }}</text>
             </g>
           </g>
@@ -534,8 +548,8 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
               width="160"
               height="72"
               rx="4"
-              fill="white"
-              stroke="#1e40af"
+              fill="var(--ui-surface)"
+              stroke="var(--ui-border)"
               stroke-width="0.7"
               filter="drop-shadow(0 2px 4px rgba(0,0,0,0.15))"
             />
@@ -544,7 +558,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
               :y="Math.max(hovered.py - 22, 24)"
               font-size="9"
               font-family="JetBrains Mono, monospace"
-              fill="#1e40af"
+              fill="var(--ui-text)"
               font-weight="bold"
             >
               {{ hovered.id }} · {{ hovered.model }}
@@ -554,16 +568,16 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
               :y="Math.max(hovered.py - 10, 38)"
               font-size="8"
               font-family="JetBrains Mono, monospace"
-              :fill="hovered.stroke"
+              fill="var(--ui-text)"
             >
-              ● {{ hovered.stateLabel }}
+              <tspan :fill="hovered.stroke">●</tspan> {{ hovered.stateLabel }}
             </text>
             <text
               :x="tooltipX + 6"
               :y="Math.max(hovered.py + 2, 50)"
               font-size="8"
               font-family="JetBrains Mono, monospace"
-              fill="#64748b"
+              fill="var(--ui-muted)"
             >
               battery {{ hovered.battery }}%
             </text>
@@ -572,7 +586,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
               :y="Math.max(hovered.py + 14, 62)"
               font-size="8"
               font-family="JetBrains Mono, monospace"
-              fill="#64748b"
+              fill="var(--ui-muted)"
             >
               {{ hovered.mission ? 'mission ' + hovered.mission : 'no mission' }}
             </text>
@@ -622,40 +636,43 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
       </div>
     </NCard>
 
-    <NCard :title="selected ? selected.id : 'Robot details'" size="small" class="!bg-white dark:!bg-slate-900">
-      <div v-if="!selected" class="text-sm text-slate-500">Click a robot to see full details.</div>
+    <NCard v-show="detailsOpen" id="live-map-robot-details" :title="selected ? selected.id : 'Robot details'" size="small">
+      <template #header-extra>
+        <NButton size="small" quaternary aria-label="Hide robot details" @click="closeDetails">Hide</NButton>
+      </template>
+      <div v-if="!selected" class="text-sm text-(color:--ui-muted)">Click a robot to see full details.</div>
       <div v-else class="flex flex-col gap-3 text-sm">
         <div class="grid place-items-center rounded bg-slate-100 py-3 dark:bg-slate-800">
           <svg width="96" height="96" viewBox="-42 -42 84 84" role="img" :aria-label="`${selected.id} · ${selected.stateLabel}`">
             <MapRobotShape :length="62" :color="selected.stroke" :rotate="selected.rotateDeg" detailed />
           </svg>
         </div>
-        <div class="flex justify-between"><span class="text-slate-500">Model</span><span class="font-mono">{{ selected.model }}</span></div>
+        <div class="flex justify-between"><span class="text-(color:--ui-muted)">Model</span><span class="font-mono">{{ selected.model }}</span></div>
         <div class="flex justify-between">
-          <span class="text-slate-500">State</span>
-          <NTag :color="{ color: selected.stroke, textColor: 'white' }" size="small">{{ selected.stateLabel }}</NTag>
+          <span class="text-(color:--ui-muted)">State</span>
+          <FleetStatusTag :color="selected.stroke" size="small">{{ selected.stateLabel }}</FleetStatusTag>
         </div>
         <ul v-if="selected.availability?.reasons?.length" class="list-disc pl-5 text-xs text-slate-500 dark:text-slate-400">
           <li v-for="reason in selected.availability.reasons" :key="reason.code">{{ reason.message }}</li>
         </ul>
-        <div class="flex justify-between"><span class="text-slate-500">Battery</span><span class="font-mono">{{ selected.battery }}%{{ selected.charging ? ' ⚡' : '' }}</span></div>
-        <div class="flex justify-between"><span class="text-slate-500">Position</span><span class="font-mono text-xs">{{ selected.x.toFixed(2) }}, {{ selected.y.toFixed(2) }} m</span></div>
-        <div class="flex justify-between"><span class="text-slate-500">Heading</span><span class="font-mono text-xs">{{ ((selected.theta * 180) / Math.PI).toFixed(1) }}°</span></div>
-        <div class="flex justify-between"><span class="text-slate-500">Map</span><span class="font-mono text-xs">{{ selected.mapId || '-' }}</span></div>
-        <div class="flex justify-between"><span class="text-slate-500">Last node</span><span class="font-mono text-xs">{{ selected.lastNodeId || '-' }}</span></div>
-        <div class="flex justify-between"><span class="text-slate-500">Mission</span><span class="font-mono text-xs">{{ selected.mission || '-' }}</span></div>
+        <div class="flex justify-between"><span class="text-(color:--ui-muted)">Battery</span><span class="font-mono">{{ selected.battery }}%{{ selected.charging ? ' ⚡' : '' }}</span></div>
+        <div class="flex justify-between"><span class="text-(color:--ui-muted)">Position</span><span class="font-mono text-xs">{{ selected.x.toFixed(2) }}, {{ selected.y.toFixed(2) }} m</span></div>
+        <div class="flex justify-between"><span class="text-(color:--ui-muted)">Heading</span><span class="font-mono text-xs">{{ ((selected.theta * 180) / Math.PI).toFixed(1) }}°</span></div>
+        <div class="flex justify-between"><span class="text-(color:--ui-muted)">Map</span><span class="font-mono text-xs">{{ selected.mapId || '-' }}</span></div>
+        <div class="flex justify-between"><span class="text-(color:--ui-muted)">Last node</span><span class="font-mono text-xs">{{ selected.lastNodeId || '-' }}</span></div>
+        <div class="flex justify-between"><span class="text-(color:--ui-muted)">Mission</span><span class="font-mono text-xs">{{ selected.mission || '-' }}</span></div>
         <template v-if="selected.route">
           <div v-if="routesStale" class="text-xs font-medium text-amber-700 dark:text-amber-300">Last known route</div>
           <div class="flex justify-between">
-            <span class="text-slate-500">Step</span>
+            <span class="text-(color:--ui-muted)">Step</span>
             <span class="font-mono text-xs">{{ selected.route.stepIndex + 1 }} → {{ selected.route.goals[0] }}</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-slate-500">Nodes ahead</span>
+            <span class="text-(color:--ui-muted)">Nodes ahead</span>
             <span class="font-mono text-xs">{{ Math.max(0, selected.route.released.nodes.length - 1) }}</span>
           </div>
           <div v-if="selected.route.nextMissionId" class="flex justify-between">
-            <span class="text-slate-500">Next mission</span>
+            <span class="text-(color:--ui-muted)">Next mission</span>
             <span class="font-mono text-xs">{{ selected.route.nextMissionId }}</span>
           </div>
         </template>
@@ -674,6 +691,15 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
 </template>
 
 <style scoped>
+/* Контрастный контур подписи остаётся виден и на препятствиях SLAM-подложки. */
+.map-label {
+  fill: var(--ui-text);
+  paint-order: stroke;
+  stroke: var(--ui-canvas);
+  stroke-width: 1.6px;
+  stroke-linejoin: round;
+}
+
 /* Поза приходит ~5 раз в секунду (MQTT visualization) — между ними робот доезжает плавно, а не прыгает.
    Только сдвиг: поворот без перехода, иначе при переходе через ±180° робот крутился бы через весь круг */
 .robot-marker {

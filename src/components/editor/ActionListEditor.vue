@@ -133,15 +133,15 @@ function paramHint(a, key) {
         </div>
         <div class="mb-1 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
           <span>Parameters</span>
-          <button class="text-brand-800 dark:text-brand-400 hover:underline" @click="addParam(i)">+ param</button>
+          <button class="text-(color:--ui-link) hover:underline" @click="addParam(i)">+ param</button>
         </div>
         <div v-if="missingParams(a).length" class="mb-1 flex flex-wrap gap-1">
           <button
             v-for="p in missingParams(a)"
             :key="p.key"
             :class="[
-              'rounded border px-1.5 py-0.5 font-mono text-[10px] hover:border-brand-800 hover:text-brand-800 dark:hover:text-brand-400',
-              p.optional ? 'border-dashed border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500' : 'border-slate-400 dark:border-slate-500 text-slate-600 dark:text-slate-300',
+              'rounded border px-1.5 py-0.5 font-mono text-[10px] hover:border-(--ui-link) hover:text-(color:--ui-link)',
+              p.optional ? 'border-dashed border-slate-300 dark:border-slate-600 text-(color:--ui-muted)' : 'border-slate-400 dark:border-slate-500 text-slate-600 dark:text-slate-300',
             ]"
             :title="`${p.type}${p.optional ? ', optional' : ', recommended'}`"
             @click="addKnownParam(i, p)"
@@ -161,7 +161,7 @@ function paramHint(a, key) {
         </div>
       </div>
       <button
-        class="flex w-full items-center justify-center gap-2 rounded border border-dashed border-slate-300 dark:border-slate-600 py-1.5 text-xs text-slate-500 dark:text-slate-400 hover:border-brand-800 hover:text-brand-800 dark:hover:text-brand-400"
+        class="flex w-full items-center justify-center gap-2 rounded border border-dashed border-slate-300 dark:border-slate-600 py-1.5 text-xs text-slate-500 dark:text-slate-400 hover:border-(--ui-link) hover:text-(color:--ui-link)"
         @click="addAction"
       >
         + Add action

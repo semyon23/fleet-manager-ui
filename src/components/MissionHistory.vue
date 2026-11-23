@@ -2,7 +2,8 @@
 // История миссий: фильтры по состоянию, роботу, карте и периоду (контракт 2.3, 7.2), страницы по курсору.
 // Не опрашивается: история — разбор прошлого, оператор обновляет сам.
 import { ref, computed, h, onMounted } from 'vue'
-import { NDataTable, NTag, NButton, NSelect, NDatePicker, NEmpty } from 'naive-ui'
+import { NDataTable, NButton, NSelect, NDatePicker, NEmpty } from 'naive-ui'
+import FleetStatusTag from './FleetStatusTag.vue'
 import { useMapsStore } from '../stores/maps'
 import { useRobotsStore } from '../stores/robots'
 import * as api from '../api'
@@ -60,13 +61,13 @@ const columns = [
   {
     title: 'Mission', key: 'id',
     render: (m) => h('button', { class: 'flex flex-col text-left', onClick: () => emit('open', m.id) }, [
-      h('span', { class: 'font-mono text-xs text-brand-800 hover:underline dark:text-brand-300' }, m.id),
-      h('span', { class: 'text-xs text-slate-500' }, m.name),
+      h('span', { class: 'font-mono text-xs text-(color:--ui-link) hover:underline' }, m.id),
+      h('span', { class: 'text-xs text-(color:--ui-muted)' }, m.name),
     ]),
   },
   {
     title: 'State', key: 'state', width: 120,
-    render: (m) => h(NTag, { size: 'small', bordered: false, color: { color: stateOf(m).color, textColor: 'white' } }, { default: () => stateOf(m).label }),
+    render: (m) => h(FleetStatusTag, { size: 'small', color: stateOf(m).color }, { default: () => stateOf(m).label }),
   },
   { title: 'Priority', key: 'priority', width: 80, render: (m) => h('span', { class: 'text-xs' }, PRIORITIES[m.priority]?.label || m.priority) },
   { title: 'Robot', key: 'robotId', width: 110, render: (m) => h('span', { class: 'font-mono text-xs' }, m.robotId || '—') },

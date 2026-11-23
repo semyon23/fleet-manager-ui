@@ -12,8 +12,51 @@ import { useBackendHealth } from './composables/useBackendHealth'
 import { useRobotMqtt } from './composables/useRobotMqtt'
 
 const robots = useRobotsStore()
-const { isDark } = useTheme()
-const naiveTheme = computed(() => (isDark.value ? darkTheme : null))
+const { palette } = useTheme()
+const naiveTheme = computed(() => {
+  const { dark, canvas, surface, raised, hover, text, muted, border, primary,
+    primaryHover, primaryPressed, onPrimary, link } = palette.value
+
+  return {
+    base: dark ? darkTheme : null,
+    overrides: {
+      common: {
+        baseColor: onPrimary,
+        primaryColor: primary,
+        primaryColorHover: primaryHover,
+        primaryColorPressed: primaryPressed,
+        primaryColorSuppl: primary,
+        infoColor: link,
+        bodyColor: canvas,
+        cardColor: surface,
+        tableColor: surface,
+        modalColor: surface,
+        popoverColor: raised,
+        inputColor: dark ? canvas : surface,
+        actionColor: raised,
+        tableHeaderColor: raised,
+        tableColorHover: hover,
+        tableColorStriped: canvas,
+        tabColor: raised,
+        tagColor: raised,
+        hoverColor: hover,
+        borderColor: border,
+        dividerColor: border,
+        textColorBase: text,
+        textColor1: text,
+        textColor2: text,
+        textColor3: muted,
+        placeholderColor: muted,
+        borderRadius: '6px',
+        fontFamily: 'var(--font-sans)',
+        fontFamilyMono: 'var(--font-mono)',
+      },
+      Input: { border: `1px solid ${border}` },
+      InternalSelection: { border: `1px solid ${border}` },
+      Switch: { railColor: muted, buttonColor: onPrimary },
+    },
+  }
+})
 const health = useBackendHealth()
 const robotMqtt = useRobotMqtt()
 
@@ -45,14 +88,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <NConfigProvider :theme="naiveTheme" :theme-overrides="themeOverrides">
+  <NConfigProvider :theme="naiveTheme.base" :theme-overrides="naiveTheme.overrides">
     <NMessageProvider>
     <NDialogProvider>
-      <div class="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <div class="flex h-screen w-screen overflow-hidden bg-(--ui-canvas) text-(color:--ui-text)">
         <AppSidebar :collapsed="collapsed" @toggle="collapsed = !collapsed" />
         <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
           <AppTopbar />
-          <main class="flex-1 overflow-auto bg-slate-50 p-6 dark:bg-slate-950">
+          <main class="flex-1 overflow-auto p-6">
             <RouterView />
           </main>
         </div>
@@ -61,19 +104,4 @@ onBeforeUnmount(() => {
     </NMessageProvider>
   </NConfigProvider>
 </template>
-
-<script>
-const themeOverrides = {
-  common: {
-    primaryColor: '#1e40af',
-    primaryColorHover: '#1d4ed8',
-    primaryColorPressed: '#1e3a8a',
-    primaryColorSuppl: '#3b82f6',
-    borderRadius: '6px',
-    fontFamily: 'Inter, system-ui, sans-serif',
-    fontFamilyMono: 'JetBrains Mono, ui-monospace, monospace',
-  },
-}
-export default { themeOverrides }
-</script>
 

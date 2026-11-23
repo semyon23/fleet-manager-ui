@@ -24,15 +24,15 @@ function toggleMocks(v) {
 </script>
 
 <template>
-  <NCard title="Settings" size="small" class="!bg-white dark:!bg-slate-900">
+  <NCard title="Settings" size="small">
     <NTabs type="line">
       <NTabPane name="api" tab="API">
         <div class="grid max-w-2xl grid-cols-1 gap-6">
-          <div class="rounded border border-slate-200 p-4">
+          <div class="rounded border border-(--ui-border) p-4">
             <div class="mb-3 flex items-center justify-between">
               <div>
                 <div class="text-sm font-semibold">Mock mode</div>
-                <div class="text-xs text-slate-500">
+                <div class="text-xs text-(color:--ui-muted)">
                   ON — all requests go to localStorage stubs.
                   OFF — real HTTP requests to the backend.
                 </div>
@@ -43,16 +43,16 @@ function toggleMocks(v) {
               Status:
               <NTag v-if="useMocks" type="warning" size="small">MOCKS</NTag>
               <NTag v-else type="success" size="small">REAL</NTag>
-              <span class="text-slate-500">·</span>
-              <span class="font-mono text-slate-600">{{ baseUrl }}</span>
+              <span class="text-(color:--ui-muted)">·</span>
+              <span class="font-mono text-(color:--ui-muted)">{{ baseUrl }}</span>
             </div>
           </div>
 
-          <label class="text-sm text-slate-600">
+          <label class="text-sm text-(color:--ui-muted)">
             REST API base URL
             <NInput v-model:value="baseUrl" placeholder="/api" class="mt-1" />
-            <div class="mt-1 text-[10px] text-slate-500">
-              Configured via <code class="rounded bg-slate-100 px-1">VITE_API_BASE_URL</code> at build time.
+            <div class="mt-1 text-[10px] text-(color:--ui-muted)">
+              Configured via <code class="rounded bg-(--ui-raised) px-1">VITE_API_BASE_URL</code> at build time.
               Runtime override — planned for the next iteration.
             </div>
           </label>
@@ -61,11 +61,11 @@ function toggleMocks(v) {
 
       <NTabPane name="conn" tab="Backend connection">
         <div class="grid max-w-lg grid-cols-1 gap-4">
-          <label class="text-sm text-slate-600">
+          <label class="text-sm text-(color:--ui-muted)">
             MQTT broker URL
             <NInput placeholder="mqtt://backend.local:1883" class="mt-1" />
           </label>
-          <label class="text-sm text-slate-600">
+          <label class="text-sm text-(color:--ui-muted)">
             WebSocket endpoint (visualization)
             <NInput placeholder="ws://backend.local:9090" class="mt-1" />
           </label>
@@ -76,16 +76,16 @@ function toggleMocks(v) {
       </NTabPane>
 
       <NTabPane name="users" tab="Users">
-        <p class="text-sm text-slate-500">Admin can register operators / engineers here.</p>
+        <p class="text-sm text-(color:--ui-muted)">Admin can register operators / engineers here.</p>
       </NTabPane>
 
       <NTabPane name="general" tab="General">
         <div class="grid max-w-lg grid-cols-1 gap-6">
-          <div class="rounded border border-slate-200 p-4 dark:border-slate-700">
+          <div class="rounded border border-(--ui-border) p-4">
             <div class="flex items-center justify-between gap-4">
               <div>
                 <div class="text-sm font-semibold">Ask before risky actions</div>
-                <div class="text-xs text-slate-500 dark:text-slate-400">
+                <div class="text-xs text-(color:--ui-muted)">
                   When an action has consequences — a map save leaves a dead end or removes the node a robot
                   stands on, deleting a robot cancels its mission — show them and ask first.
                   Off — do it at once and show the consequences as a notification.
@@ -96,15 +96,15 @@ function toggleMocks(v) {
             </div>
           </div>
 
-          <div class="rounded border border-slate-200 dark:border-slate-700 p-4">
+          <div class="rounded border border-(--ui-border) p-4">
             <div class="mb-3 text-sm font-semibold">Theme</div>
-            <NRadioGroup :value="themeMode.value" @update:value="setThemeMode">
+            <NRadioGroup :value="themeMode" @update:value="setThemeMode">
               <NRadioButton value="light">☀ Light</NRadioButton>
               <NRadioButton value="dark">🌙 Dark</NRadioButton>
               <NRadioButton value="system">🖥 System</NRadioButton>
             </NRadioGroup>
-            <div class="mt-2 text-[10px] text-slate-500 dark:text-slate-400">
-              System — follows OS preference (prefers-color-scheme). Persisted in localStorage.
+            <div class="mt-2 text-[10px] text-(color:--ui-muted)">
+              System follows your device theme. Your choice is saved in this browser.
             </div>
           </div>
         </div>

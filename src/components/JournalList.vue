@@ -97,12 +97,12 @@ function when(iso) {
           <div class="flex flex-wrap items-baseline gap-x-2">
             <span class="font-medium">{{ line.title }}</span>
             <span v-if="line.robotId && !robotId" class="font-mono text-xs text-brand-800 dark:text-brand-300">{{ line.robotId }}</span>
-            <button v-if="line.missionId && !missionId" class="font-mono text-xs text-slate-500 hover:underline"
+            <button v-if="line.missionId && !missionId" class="font-mono text-xs text-(color:--ui-link) hover:underline"
                     @click="emit('open-mission', line.missionId)">{{ line.missionId }}</button>
           </div>
-          <div v-if="line.detail" class="truncate text-xs text-slate-500" :title="line.detail">{{ line.detail }}</div>
+          <div v-if="line.detail" class="truncate text-xs text-(color:--ui-muted)" :title="line.detail">{{ line.detail }}</div>
         </div>
-        <span class="shrink-0 font-mono text-[11px] text-slate-400">{{ when(line.at) }}</span>
+        <span class="shrink-0 font-mono text-[11px] text-(color:--ui-muted)">{{ when(line.at) }}</span>
       </li>
     </ol>
 

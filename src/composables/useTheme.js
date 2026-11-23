@@ -12,10 +12,11 @@ function systemPrefersDark() {
 // mode: 'light' | 'dark' | 'system' — что явно выбрал пользователь.
 // effective: 'light' | 'dark' — что реально применяется (system разворачивается).
 function loadMode() {
-  if (typeof localStorage === 'undefined') return 'system'
-  const saved = localStorage.getItem(LS_KEY)
-  if (saved === 'light' || saved === 'dark' || saved === 'system') return saved
-  return 'system'
+  try {
+    const saved = localStorage.getItem(LS_KEY)
+    if (saved === 'light' || saved === 'system') return saved
+  } catch { /* Private sessions may disable storage. */ }
+  return 'dark'
 }
 
 const mode = ref(loadMode())
@@ -32,8 +33,7 @@ watch(mode, (m) => {
   effective.value = m === 'system' ? (systemPrefersDark() ? 'dark' : 'light') : m
   apply(effective.value)
   try {
-    if (m === 'system') localStorage.removeItem(LS_KEY)
-    else localStorage.setItem(LS_KEY, m)
+    localStorage.setItem(LS_KEY, m)
   } catch (_) {}
 })
 
@@ -45,6 +45,19 @@ if (media && media.addEventListener) {
     }
   })
 }
+
+// Canvas and Naive UI mix colors in JS and need resolved CSS values.
+const palette = computed(() => {
+  const dark = effective.value === 'dark'
+  const styles = getComputedStyle(document.documentElement)
+  const color = (name) => styles.getPropertyValue(`--ui-${name}`).trim()
+  return {
+    dark, canvas: color('canvas'), surface: color('surface'), raised: color('raised'),
+    hover: color('hover'), border: color('border'), text: color('text'), muted: color('muted'),
+    primary: color('primary'), primaryHover: color('primary-hover'), primaryPressed: color('primary-pressed'),
+    onPrimary: color('on-primary'), link: color('link'),
+  }
+})
 
 export function useTheme() {
   const theme = computed(() => effective.value)
@@ -58,5 +71,5 @@ export function useTheme() {
     // Тумблер солнце/луна — всегда фиксирует явный выбор (light↔dark), выходит из system.
     mode.value = effective.value === 'dark' ? 'light' : 'dark'
   }
-  return { theme, isDark, mode: currentMode, setMode, toggle }
+  return { theme, isDark, mode: currentMode, palette, setMode, toggle }
 }

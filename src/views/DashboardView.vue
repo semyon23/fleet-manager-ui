@@ -1,12 +1,12 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useRobotsStore } from '../stores/robots'
 import { NCard, NEmpty, NButton } from 'naive-ui'
 import { RouterLink } from 'vue-router'
 import RobotIcon from '../components/RobotIcon.vue'
 import JournalList from '../components/JournalList.vue'
 import { useTheme } from '../composables/useTheme'
-import { AVAILABILITY, availabilityOf } from '../lib/availability'
+import { AVAILABILITY, availabilityOf, batteryColor } from '../lib/availability'
 
 import {
   Chart as ChartJS,
@@ -22,7 +22,15 @@ import { Doughnut, Bar } from 'vue-chartjs'
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend)
 
 const store = useRobotsStore()
-const { isDark } = useTheme()
+const { palette: chartColors } = useTheme()
+
+const tooltip = computed(() => ({
+  backgroundColor: chartColors.value.surface,
+  titleColor: chartColors.value.text,
+  bodyColor: chartColors.value.text,
+  borderColor: chartColors.value.border,
+  borderWidth: 1,
+}))
 
 const kpis = computed(() => [
   { label: 'Total', value: store.byState.total },
@@ -46,7 +54,7 @@ const statusData = computed(() => {
   }
   return {
     labels,
-    datasets: [{ data, backgroundColor: colors, borderColor: isDark.value ? '#0f172a' : '#ffffff', borderWidth: 2 }],
+    datasets: [{ data, backgroundColor: colors, borderColor: chartColors.value.surface, borderWidth: 2 }],
   }
 })
 
@@ -55,10 +63,11 @@ const statusOptions = computed(() => ({
   maintainAspectRatio: false,
   cutout: '65%',
   plugins: {
+    tooltip: tooltip.value,
     legend: {
       position: 'right',
       labels: {
-        color: isDark.value ? '#cbd5e1' : '#334155',
+        color: chartColors.value.text,
         boxWidth: 12,
         boxHeight: 12,
         font: { family: 'JetBrains Mono, monospace', size: 11 },
@@ -75,7 +84,7 @@ const batteryData = computed(() => {
     datasets: [{
       label: 'Battery %',
       data: items.map((r) => r.battery),
-      backgroundColor: items.map((r) => r.battery < 20 ? '#ef4444' : r.battery < 50 ? '#eab308' : '#22c55e'),
+      backgroundColor: items.map((r) => batteryColor(r.battery, chartColors.value.primary)),
       borderRadius: 4,
     }],
   }
@@ -84,32 +93,32 @@ const batteryData = computed(() => {
 const batteryOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { legend: { display: false } },
+  plugins: { legend: { display: false }, tooltip: tooltip.value },
   scales: {
     x: {
-      ticks: { color: isDark.value ? '#94a3b8' : '#64748b', font: { family: 'JetBrains Mono, monospace', size: 10 } },
+      ticks: { color: chartColors.value.muted, font: { family: 'JetBrains Mono, monospace', size: 10 } },
       grid: { display: false },
+      border: { color: chartColors.value.border },
     },
     y: {
       min: 0, max: 100,
       ticks: {
-        color: isDark.value ? '#94a3b8' : '#64748b',
+        color: chartColors.value.muted,
         callback: (v) => `${v}%`,
       },
-      grid: { color: isDark.value ? '#1e293b' : '#e2e8f0' },
+      grid: { color: chartColors.value.border },
+      border: { color: chartColors.value.border },
     },
   },
 }))
 
-// Force reactivity kick после первого mount — чтоб графики нарисовались когда poll долетит.
-onMounted(() => {})
 </script>
 
 <template>
   <div class="flex flex-col gap-6">
     <!-- ================ Top: KPI row ================ -->
     <div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-      <NCard v-for="kpi in kpis" :key="kpi.label" size="small" class="!bg-white dark:!bg-slate-900">
+      <NCard v-for="kpi in kpis" :key="kpi.label" size="small">
         <div class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ kpi.label }}</div>
         <div class="mt-2 font-mono text-3xl font-bold text-brand-900 dark:text-brand-200">{{ kpi.value }}</div>
       </NCard>
@@ -117,7 +126,7 @@ onMounted(() => {})
 
     <!-- ================ Charts row ================ -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <NCard title="Availability" size="small" class="!bg-white dark:!bg-slate-900">
+      <NCard title="Availability" size="small">
         <div v-if="store.byState.total === 0" class="grid place-items-center py-8">
           <NEmpty description="No robots registered yet" size="small">
             <template #extra>
@@ -132,7 +141,7 @@ onMounted(() => {})
         </div>
       </NCard>
 
-      <NCard title="Battery levels" size="small" class="!bg-white dark:!bg-slate-900">
+      <NCard title="Battery levels" size="small">
         <div v-if="store.byState.total === 0" class="grid place-items-center py-8">
           <NEmpty description="Register robots to see their battery levels" size="small" />
         </div>
@@ -144,14 +153,14 @@ onMounted(() => {})
 
     <!-- ================ Bottom: events + snapshot ================ -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-      <NCard title="Recent events" size="small" class="lg:col-span-2 !bg-white dark:!bg-slate-900">
+      <NCard title="Recent events" size="small" class="lg:col-span-2">
         <template #header-extra>
-          <RouterLink to="/events?tab=journal" class="text-xs text-brand-800 hover:underline dark:text-brand-300">Journal →</RouterLink>
+          <RouterLink to="/events?tab=journal" class="text-xs text-(color:--ui-link) hover:underline">Journal →</RouterLink>
         </template>
         <JournalList :limit="10" :more="false" />
       </NCard>
 
-      <NCard title="Fleet snapshot" size="small" class="!bg-white dark:!bg-slate-900">
+      <NCard title="Fleet snapshot" size="small">
         <div v-if="!store.robots.length" class="grid place-items-center py-6">
           <NEmpty description="No robots" size="small" />
         </div>

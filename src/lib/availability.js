@@ -20,4 +20,10 @@ export function availabilityOf(robot) {
   return AVAILABILITY[robot?.availability?.state] || UNKNOWN
 }
 
+export function batteryColor(level, healthyColor = 'var(--ui-primary)') {
+  if (level < 20) return AVAILABILITY.ERROR.color
+  if (level < 50) return AVAILABILITY.CHARGING.color
+  return healthyColor
+}
+
 export const AVAILABILITY_OPTIONS = Object.entries(AVAILABILITY).map(([value, { label }]) => ({ label, value }))

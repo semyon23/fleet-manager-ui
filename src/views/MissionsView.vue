@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed, watch, h, onMounted, onBeforeUnmount } from 'vue'
 import {
-  NCard, NDataTable, NTag, NButton, NModal, NInput, NSelect, NEmpty, NPopconfirm, NTabs, NTabPane, useMessage,
+  NCard, NDataTable, NButton, NModal, NInput, NSelect, NEmpty, NPopconfirm, NTabs, NTabPane, useMessage,
 } from 'naive-ui'
+import FleetStatusTag from '../components/FleetStatusTag.vue'
 import { useMapsStore } from '../stores/maps'
 import { useRobotsStore } from '../stores/robots'
 import ActionListEditor from '../components/editor/ActionListEditor.vue'
@@ -65,14 +66,14 @@ function openMission(id) {
 
 // === Таблицы ===
 const time = (iso) => (iso ? new Date(iso).toLocaleTimeString() : '—')
-const tag = (meta) => h(NTag, { size: 'small', bordered: false, color: { color: meta.color, textColor: 'white' } }, { default: () => meta.label })
+const tag = (meta) => h(FleetStatusTag, { size: 'small', color: meta.color }, { default: () => meta.label })
 
 const commonColumns = [
   {
     title: 'Mission', key: 'id',
     render: (m) => h('button', { class: 'flex flex-col text-left', onClick: () => openMission(m.id) }, [
-      h('span', { class: 'font-mono text-xs text-brand-800 hover:underline dark:text-brand-300' }, m.id),
-      h('span', { class: 'text-xs text-slate-500' }, m.name),
+      h('span', { class: 'font-mono text-xs text-(color:--ui-link) hover:underline' }, m.id),
+      h('span', { class: 'text-xs text-(color:--ui-muted)' }, m.name),
     ]),
   },
   { title: 'Priority', key: 'priority', width: 90, render: (m) => tag(PRIORITIES[m.priority] || PRIORITIES.NORMAL) },
@@ -92,7 +93,7 @@ const commonColumns = [
     title: 'Progress', key: 'progress',
     render: (m) => {
       const p = progressOf(m)
-      return h('span', { class: 'font-mono text-xs text-slate-500' },
+      return h('span', { class: 'font-mono text-xs text-(color:--ui-muted)' },
         `${p.done}/${p.total} steps` + (p.nodeId ? ` → ${p.nodeId}` : ''))
     },
   },
@@ -197,7 +198,7 @@ async function submit() {
 
 <template>
   <div>
-    <NCard size="small" class="!bg-white dark:!bg-slate-900">
+    <NCard size="small">
       <NTabs type="line" default-value="current" animated>
         <template #suffix>
           <NButton type="primary" size="small" :disabled="!maps.maps.length" @click="openBuilder">+ Create mission</NButton>
@@ -251,7 +252,7 @@ async function submit() {
 
         <div class="grid grid-cols-2 gap-3">
           <label class="text-sm text-slate-600 dark:text-slate-400">
-            Name <span class="text-xs text-slate-400">(optional)</span>
+            Name <span class="text-xs text-(color:--ui-muted)">(optional)</span>
             <NInput v-model:value="form.name" placeholder="Pallet A3 → Dock 2" class="mt-1" />
           </label>
           <label class="text-sm text-slate-600 dark:text-slate-400">
@@ -284,7 +285,7 @@ async function submit() {
               :class="stepErrors(errors.details, i).length ? 'border-rose-400' : 'border-slate-100 dark:border-slate-800'"
             >
               <div class="flex items-center gap-2">
-                <span class="w-6 text-right font-mono text-xs text-slate-400">{{ i + 1 }}.</span>
+                <span class="w-6 text-right font-mono text-xs text-(color:--ui-muted)">{{ i + 1 }}.</span>
                 <NSelect v-model:value="step.nodeId" :options="nodeOptions" filterable size="small"
                          placeholder="Node" class="flex-1" />
                 <NButton size="tiny" tertiary :disabled="i === 0" title="Move up" @click="moveStep(i, -1)">↑</NButton>
@@ -316,7 +317,7 @@ async function submit() {
 
       <template #footer>
         <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-400 dark:text-slate-500">
+          <span class="text-xs text-(color:--ui-muted)">
             {{ form.requestedRobotId ? `Only ${form.requestedRobotId} will take it` : 'fms picks the robot that gets to step 1 fastest' }}
           </span>
           <div class="flex gap-2">
