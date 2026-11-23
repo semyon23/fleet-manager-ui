@@ -3,6 +3,7 @@ import { useRobotsStore } from '../stores/robots'
 import { useMapsStore } from '../stores/maps'
 import { NCard, NSelect, NButton, NPopover, NCheckbox } from 'naive-ui'
 import { ref, shallowRef, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { robotLook, footprintPx } from '../lib/robotLook'
 import { createLiveRoutePoller } from '../lib/liveRoutePolling'
 import { releasedPoints, plannedPoints, goalPoints, toPolyline } from '../lib/robotRoutes'
@@ -11,23 +12,65 @@ import { stationKindMeta } from '../lib/theme'
 import { zoneTypeMeta } from '../lib/vda5050'
 import { worldToPixel } from '../lib/nav2meta'
 import { worldAngleToSvgDeg } from '../lib/geometry'
+import { formatEventTime } from '../lib/journal'
 import PlaceRobotDialog from '../components/PlaceRobotDialog.vue'
 import MapRobotShape from '../components/MapRobotShape.vue'
 import FleetStatusTag from '../components/FleetStatusTag.vue'
 
 const robots = useRobotsStore()
 const maps = useMapsStore()
+const route = useRoute()
+const router = useRouter()
+
+const selectedId = ref(null)
+const selected = computed(() => robots.robots.find(r => r.id === selectedId.value))
+const selectedLook = computed(() => robotLook(selected.value))
+const hoveredId = ref(null)
+const following = ref(false)
+const detailsOpen = ref(false)
+const detailsToggle = ref(null)
+
+function hasPosition(r) {
+  return !!r?.mapId && r.positionInitialized && Number.isFinite(r.x) && Number.isFinite(r.y)
+}
+const lastReported = computed(() => selected.value && (
+  selected.value.connection !== 'ONLINE' || selected.value.availability?.state === 'OFFLINE' || !!robots.lastPollError
+))
+
+function focusRobot(id) {
+  selectedId.value = id
+  following.value = !!id
+  hoveredId.value = null
+  if (id) {
+    mapPicked.value = true
+    detailsOpen.value = true
+  }
+}
+
+function selectRobot(id) {
+  if (route.query.robotId === id) focusRobot(id)
+  else router.replace({ query: { ...route.query, robotId: id } })
+}
 
 // Карт может быть несколько сразу: робот на той, что в его pose.mapId. Пока оператор карту не выбрал сам —
 // показываем ту, на которой есть роботы (роботы приходят опросом позже карт), иначе первую.
 const selectedMapId = ref(null)
 const mapPicked = ref(false)
+watch(() => route.query.robotId, (id) => {
+  focusRobot(typeof id === 'string' && id ? id : null)
+}, { immediate: true })
 watchEffect(() => {
+  if (following.value && selectedId.value) {
+    selectedMapId.value = selected.value?.mapId || null
+    return
+  }
   if (mapPicked.value && maps.get(selectedMapId.value)) return
   const withRobots = maps.maps.find((m) => robots.robots.some((r) => r.mapId === m.id))
   selectedMapId.value = (withRobots || maps.maps[0])?.id || null
 })
 function pickMap(id) {
+  focusRobot(null)
+  if (route.query.robotId) router.replace({ query: { ...route.query, robotId: undefined } })
   selectedMapId.value = id
   mapPicked.value = true
 }
@@ -37,24 +80,22 @@ const activeMap = computed(() => {
   const m = selectedMapId.value ? maps.get(selectedMapId.value) : null
   return m?.full ? m : null
 })
-watch(selectedMapId, (id) => {
-  if (id) maps.open(id).catch((e) => console.warn('[live-map] map not loaded:', e.message))
+const mapUnavailable = ref(false)
+async function loadMap(id) {
+  mapUnavailable.value = false
+  if (!id) return
+  try {
+    await maps.open(id)
+  } catch {
+    if (selectedMapId.value === id) mapUnavailable.value = true
+  }
+}
+watch([selectedMapId, () => !!activeMap.value], ([id, loaded]) => {
+  if (!loaded) loadMap(id)
 }, { immediate: true })
 const mapOptions = computed(() =>
   maps.maps.length ? maps.maps.map((m) => ({ label: m.name, value: m.id })) : [],
 )
-
-// Выбранного храним по id: карточка справа берёт свежие данные из markers (поза из MQTT, опрос)
-const selectedId = ref(null)
-const selected = computed(() => markers.value.find((m) => m.id === selectedId.value) || null)
-const hovered = ref(null)
-const detailsOpen = ref(false)
-const detailsToggle = ref(null)
-
-function selectRobot(id) {
-  selectedId.value = id
-  detailsOpen.value = true
-}
 
 function closeDetails() {
   detailsOpen.value = false
@@ -88,7 +129,7 @@ const robotSize = computed(() =>
 const detailedRobots = computed(() => robotSize.value.length / perScreenPx.value >= 44)
 
 const filteredRobots = computed(() =>
-  activeMap.value ? robots.robots.filter((r) => r.mapId === activeMap.value.id) : [],
+  activeMap.value ? robots.robots.filter((r) => r.mapId === activeMap.value.id && hasPosition(r)) : [],
 )
 const elsewhereCount = computed(() => robots.robots.filter((r) => r.mapId !== selectedMapId.value).length)
 const showPlace = ref(false)
@@ -175,48 +216,75 @@ const ZOOM_MIN = 0.25
 const ZOOM_MAX = 5
 const ZOOM_STEP = 1.25
 const zoom = ref(1)
-const panX = ref(0)
-const panY = ref(0)
+const cameraCenter = ref(null)
 
 function zoomIn() { zoom.value = Math.min(ZOOM_MAX, zoom.value * ZOOM_STEP) }
 function zoomOut() { zoom.value = Math.max(ZOOM_MIN, zoom.value / ZOOM_STEP) }
-function zoomReset() { zoom.value = 1; panX.value = 0; panY.value = 0 }
+function zoomReset() {
+  following.value = false
+  cameraCenter.value = null
+  zoom.value = 1
+}
+
+watch(selectedMapId, () => {
+  cameraCenter.value = null
+  zoom.value = 1
+  hoveredId.value = null
+}, { flush: 'sync' })
 
 const PADDING = 60
 
 const viewSize = computed(() =>
   activeMap.value ? { w: activeMap.value.width + PADDING * 2, h: activeMap.value.height + PADDING * 2 } : { w: 700, h: 600 },
 )
-const viewBox = computed(() => `0 0 ${viewSize.value.w} ${viewSize.value.h}`)
-
-const zoomTransform = computed(() => {
-  const { w, h } = viewSize.value
-  return `translate(${panX.value} ${panY.value}) translate(${w / 2} ${h / 2}) scale(${zoom.value}) translate(${-w / 2} ${-h / 2})`
+// SVG, подложка, сетка и роботы используют одну систему координат карты.
+const center = computed(() => cameraCenter.value ?? { x: viewSize.value.w / 2, y: viewSize.value.h / 2 })
+const viewport = computed(() => {
+  const width = svgBox.value.w > 0 ? svgBox.value.w * perScreenPx.value : viewSize.value.w
+  const height = svgBox.value.h > 0 ? svgBox.value.h * perScreenPx.value : viewSize.value.h
+  return { x: center.value.x - width / 2, y: center.value.y - height / 2, width, height }
+})
+const viewBox = computed(() => {
+  const { x, y, width, height } = viewport.value
+  return `${x} ${y} ${width} ${height}`
+})
+// При отдалении прореживаем линии по степеням двойки, сохраняя привязку к карте.
+const gridStep = computed(() => {
+  const baseStep = 25
+  const minSpacing = 12 * perScreenPx.value
+  const levels = Math.max(0, Math.ceil(Math.log2(minSpacing / baseStep)))
+  return baseStep * 2 ** levels
 })
 
-// Pan: мышь драг по SVG. Дельта конвертируется из экранных пикселей в SVG-координаты
-// через отношение viewBox.width / clientWidth.
 const svgRef = ref(null)
 const isDragging = ref(false)
 let dragStart = null
 
-function onMouseDown(e) {
-  if (e.button !== 0) return
-  isDragging.value = true
-  dragStart = { x: e.clientX, y: e.clientY, panX: panX.value, panY: panY.value }
-  e.preventDefault()
+function startPan(e) {
+  if (e.button === 0 && e.isPrimary) dragStart = { id: e.pointerId, x: e.clientX, y: e.clientY }
 }
-function onMouseMove(e) {
-  if (!isDragging.value || !dragStart || !svgRef.value) return
-  const rect = svgRef.value.getBoundingClientRect()
-  const vb = svgRef.value.viewBox.baseVal
-  const kx = vb.width / rect.width
-  const ky = vb.height / rect.height
-  panX.value = dragStart.panX + (e.clientX - dragStart.x) * kx
-  panY.value = dragStart.panY + (e.clientY - dragStart.y) * ky
+function pan(e) {
+  if (e.pointerId !== dragStart?.id) return
+  const dx = e.clientX - dragStart.x
+  const dy = e.clientY - dragStart.y
+  if (!isDragging.value) {
+    if (Math.hypot(dx, dy) < 4) return
+    dragStart.center = center.value
+    isDragging.value = true
+    following.value = false
+    hoveredId.value = null
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  cameraCenter.value = {
+    x: dragStart.center.x - dx * perScreenPx.value,
+    y: dragStart.center.y - dy * perScreenPx.value,
+  }
 }
-function onMouseUp() { isDragging.value = false; dragStart = null }
-function onMouseLeave() { isDragging.value = false; dragStart = null }
+function endPan(e) {
+  if (e.pointerId !== dragStart?.id) return
+  isDragging.value = false
+  dragStart = null
+}
 
 const stations = computed(() => {
   if (!layers.value.stations || !activeMap.value?.stations?.length) return []
@@ -301,9 +369,18 @@ const markers = computed(() =>
     }
   }),
 )
-const markersInDrawOrder = computed(() => selected.value
-  ? [...markers.value.filter((m) => m.id !== selectedId.value), selected.value]
+const selectedMarker = computed(() => markers.value.find(m => m.id === selectedId.value))
+const selectedRoute = computed(() => selectedMarker.value?.route)
+const markersInDrawOrder = computed(() => selectedMarker.value
+  ? [...markers.value.filter((m) => m.id !== selectedId.value), selectedMarker.value]
   : markers.value)
+
+watchEffect(() => {
+  if (!following.value) return
+  const target = selectedMarker.value
+  if (!Number.isFinite(target?.px) || !Number.isFinite(target?.py)) return
+  cameraCenter.value = { x: target.px, y: target.py }
+})
 
 // Узел карты → точка на картинке (как у дорог); узла нет — null
 const nodePositions = computed(() => {
@@ -345,8 +422,14 @@ const routeLines = computed(() => {
     }))
     .sort((a, b) => Number(a.selected) - Number(b.selected))
 })
-// Подсказка у робота — не вылезать за правый край карты
-const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 : 0, viewSize.value.w - 170))
+const hovered = computed(() => markers.value.find(m => m.id === hoveredId.value))
+const tooltipTransform = computed(() => {
+  const { x, y, width, height } = viewport.value
+  const unit = perScreenPx.value
+  const left = Math.max(x, Math.min(hovered.value.px + 24 * unit, x + width - 160 * unit))
+  const top = Math.max(y, Math.min(hovered.value.py - 36 * unit, y + height - 72 * unit))
+  return `translate(${left} ${top}) scale(${unit})`
+})
 </script>
 
 <template>
@@ -363,7 +446,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
             style="width: 240px; max-width: 100%"
             @update:value="pickMap"
           />
-          <router-link v-else to="/maps" class="text-xs text-(color:--ui-link) hover:underline">
+          <router-link v-else-if="!selectedId" to="/maps" class="text-xs text-(color:--ui-link) hover:underline">
             No maps uploaded yet -> upload one
           </router-link>
           <span v-if="mapOptions.length && elsewhereCount" class="text-xs text-slate-500 dark:text-slate-400">
@@ -397,37 +480,34 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
       >
         <svg
           ref="svgRef"
-          class="h-full w-full"
+          class="h-full w-full touch-none select-none"
           :class="isDragging ? 'cursor-grabbing' : 'cursor-grab'"
           :viewBox="viewBox"
           preserveAspectRatio="xMidYMid meet"
-          @mousedown="onMouseDown"
-          @mousemove="onMouseMove"
-          @mouseup="onMouseUp"
-          @mouseleave="onMouseLeave"
+          @pointerdown="startPan"
+          @pointermove="pan"
+          @pointerup="endPan"
+          @pointercancel="endPan"
+          @lostpointercapture.self="endPan"
+          @pointerleave="!isDragging && endPan($event)"
         >
           <defs>
-            <pattern id="live-map-grid" width="25" height="25" patternUnits="userSpaceOnUse">
-              <path d="M 25 0 L 0 0 0 25" fill="none" stroke="var(--ui-border)" stroke-width="0.6" />
+            <pattern id="live-map-grid" patternUnits="userSpaceOnUse"
+                     :x="PADDING" :y="PADDING" :width="gridStep" :height="gridStep" :viewBox="`0 0 ${gridStep} ${gridStep}`">
+              <path :d="`M ${gridStep} 0 H 0 V ${gridStep}`" fill="none" stroke="var(--ui-border)" :stroke-width="1.4 * perScreenPx" />
             </pattern>
           </defs>
 
-          <rect width="100%" height="100%" fill="url(#live-map-grid)" />
-
-          <g :transform="zoomTransform">
-          <template v-if="activeMap">
-            <image
-              :href="activeMap.pgmDataUrl"
-              :x="PADDING" :y="PADDING"
-              :width="activeMap.width"
-              :height="activeMap.height"
-              preserveAspectRatio="none"
-              class="opacity-80 dark:opacity-60 dark:invert"
-            />
-          </template>
-          <text v-else x="350" y="300" text-anchor="middle" font-size="14" class="fill-slate-400">
-            {{ mapOptions.length ? 'Loading the map…' : 'No maps in fms' }}
-          </text>
+          <image
+            v-if="activeMap?.pgmDataUrl"
+            :href="activeMap.pgmDataUrl"
+            :x="PADDING" :y="PADDING"
+            :width="activeMap.width"
+            :height="activeMap.height"
+            preserveAspectRatio="none"
+            class="opacity-80 dark:opacity-60 dark:invert"
+          />
+          <rect v-bind="viewport" fill="url(#live-map-grid)" />
 
           <g v-if="zones.length">
             <g v-for="z in zones" :key="z.id">
@@ -508,6 +588,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
             v-for="m in markersInDrawOrder"
             :key="m.id"
             class="robot-marker"
+            :class="{ 'is-followed': following && m.id === selectedId }"
             :style="{ transform: `translate(${m.px}px, ${m.py}px)` }"
             role="button"
             tabindex="0"
@@ -516,8 +597,8 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
             @click.stop="selectRobot(m.id)"
             @keydown.enter.prevent="selectRobot(m.id)"
             @keydown.space.prevent="selectRobot(m.id)"
-            @mouseenter="hovered = m"
-            @mouseleave="hovered = null"
+            @mouseenter="!isDragging && (hoveredId = m.id)"
+            @mouseleave="hoveredId = null"
           >
             <!-- Невидимая подложка: попасть мышью по маленькому роботу -->
             <circle :r="Math.max(robotSize.length * 0.75, 22 * perScreenPx)" fill="transparent" />
@@ -541,10 +622,8 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
             </g>
           </g>
 
-          <g v-if="hovered" pointer-events="none">
+          <g v-if="hovered" :transform="tooltipTransform" pointer-events="none">
             <rect
-              :x="tooltipX"
-              :y="Math.max(hovered.py - 36, 8)"
               width="160"
               height="72"
               rx="4"
@@ -554,8 +633,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
               filter="drop-shadow(0 2px 4px rgba(0,0,0,0.15))"
             />
             <text
-              :x="tooltipX + 6"
-              :y="Math.max(hovered.py - 22, 24)"
+              x="6" y="14"
               font-size="9"
               font-family="JetBrains Mono, monospace"
               fill="var(--ui-text)"
@@ -564,8 +642,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
               {{ hovered.id }} · {{ hovered.model }}
             </text>
             <text
-              :x="tooltipX + 6"
-              :y="Math.max(hovered.py - 10, 38)"
+              x="6" y="28"
               font-size="8"
               font-family="JetBrains Mono, monospace"
               fill="var(--ui-text)"
@@ -573,8 +650,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
               <tspan :fill="hovered.stroke">●</tspan> {{ hovered.stateLabel }}
             </text>
             <text
-              :x="tooltipX + 6"
-              :y="Math.max(hovered.py + 2, 50)"
+              x="6" y="42"
               font-size="8"
               font-family="JetBrains Mono, monospace"
               fill="var(--ui-muted)"
@@ -582,8 +658,7 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
               battery {{ hovered.battery }}%
             </text>
             <text
-              :x="tooltipX + 6"
-              :y="Math.max(hovered.py + 14, 62)"
+              x="6" y="56"
               font-size="8"
               font-family="JetBrains Mono, monospace"
               fill="var(--ui-muted)"
@@ -591,9 +666,17 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
               {{ hovered.mission ? 'mission ' + hovered.mission : 'no mission' }}
             </text>
           </g>
-          </g><!-- /zoomTransform -->
         </svg>
 
+        <div v-if="!activeMap" role="status"
+             class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-(color:--ui-muted)">
+          <template v-if="mapUnavailable && selectedMapId">
+            <span>Map {{ selectedMapId }} is unavailable.</span>
+            <NButton size="small" class="pointer-events-auto" @click="loadMap(selectedMapId)">Retry</NButton>
+          </template>
+          <span v-else-if="selectedMapId">Loading the map…</span>
+          <span v-else-if="!selectedId">No maps in fms</span>
+        </div>
         <div role="status" class="pointer-events-none absolute left-3 right-14 top-3">
           <span v-if="routeNotice" class="inline-block rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
             {{ routeNotice }}
@@ -631,49 +714,68 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
         </div>
 
         <div class="pointer-events-none absolute bottom-2 right-3 rounded bg-white/85 px-2 py-0.5 text-[10px] font-mono text-slate-500 shadow dark:bg-slate-900/85 dark:text-slate-400">
+          <span v-if="following && selectedMarker">{{ lastReported ? 'Focused on' : 'Following' }} {{ selectedId }} · </span>
           zoom {{ Math.round(zoom * 100) }}% · drag to pan
         </div>
       </div>
     </NCard>
 
-    <NCard v-show="detailsOpen" id="live-map-robot-details" :title="selected ? selected.id : 'Robot details'" size="small">
+    <NCard v-show="detailsOpen" id="live-map-robot-details" :title="selectedId || 'Robot details'" size="small">
       <template #header-extra>
         <NButton size="small" quaternary aria-label="Hide robot details" @click="closeDetails">Hide</NButton>
       </template>
-      <div v-if="!selected" class="text-sm text-(color:--ui-muted)">Click a robot to see full details.</div>
+      <div v-if="!selected" role="status" class="text-sm text-(color:--ui-muted)">
+        <span v-if="!selectedId">Click a robot to see full details.</span>
+        <span v-else-if="robots.lastPollError">Robot data is unavailable. Reconnecting…</span>
+        <span v-else-if="!robots.lastPollAt">Loading robot…</span>
+        <span v-else>Robot {{ selectedId }} is no longer in the fleet.</span>
+      </div>
       <div v-else class="flex flex-col gap-3 text-sm">
-        <div class="grid place-items-center rounded bg-slate-100 py-3 dark:bg-slate-800">
-          <svg width="96" height="96" viewBox="-42 -42 84 84" role="img" :aria-label="`${selected.id} · ${selected.stateLabel}`">
-            <MapRobotShape :length="62" :color="selected.stroke" :rotate="selected.rotateDeg" detailed />
+        <div v-if="hasPosition(selected)" class="grid place-items-center rounded bg-slate-100 py-3 dark:bg-slate-800">
+          <svg width="96" height="96" viewBox="-42 -42 84 84" role="img" :aria-label="`${selected.id} · ${selectedLook.label}`">
+            <MapRobotShape :length="62" :color="selectedLook.color" :rotate="worldAngleToSvgDeg(selected.theta)" detailed />
           </svg>
         </div>
         <div class="flex justify-between"><span class="text-(color:--ui-muted)">Model</span><span class="font-mono">{{ selected.model }}</span></div>
         <div class="flex justify-between">
           <span class="text-(color:--ui-muted)">State</span>
-          <FleetStatusTag :color="selected.stroke" size="small">{{ selected.stateLabel }}</FleetStatusTag>
+          <FleetStatusTag :color="selectedLook.color" size="small">{{ selectedLook.label }}</FleetStatusTag>
         </div>
         <ul v-if="selected.availability?.reasons?.length" class="list-disc pl-5 text-xs text-slate-500 dark:text-slate-400">
           <li v-for="reason in selected.availability.reasons" :key="reason.code">{{ reason.message }}</li>
         </ul>
-        <div class="flex justify-between"><span class="text-(color:--ui-muted)">Battery</span><span class="font-mono">{{ selected.battery }}%{{ selected.charging ? ' ⚡' : '' }}</span></div>
-        <div class="flex justify-between"><span class="text-(color:--ui-muted)">Position</span><span class="font-mono text-xs">{{ selected.x.toFixed(2) }}, {{ selected.y.toFixed(2) }} m</span></div>
-        <div class="flex justify-between"><span class="text-(color:--ui-muted)">Heading</span><span class="font-mono text-xs">{{ ((selected.theta * 180) / Math.PI).toFixed(1) }}°</span></div>
+        <div v-if="selected.lastStateAt" class="flex justify-between"><span class="text-(color:--ui-muted)">Battery</span><span class="font-mono">{{ selected.battery }}%{{ selected.charging ? ' ⚡' : '' }}</span></div>
+        <template v-if="hasPosition(selected)">
+          <div class="flex justify-between gap-2"><span class="text-(color:--ui-muted)">{{ lastReported ? 'Last known position' : 'Position' }}</span><span class="font-mono text-xs">{{ selected.x.toFixed(2) }}, {{ selected.y.toFixed(2) }} m</span></div>
+          <div class="flex justify-between"><span class="text-(color:--ui-muted)">Heading</span><span class="font-mono text-xs">{{ ((selected.theta * 180) / Math.PI).toFixed(1) }}°</span></div>
+        </template>
+        <p v-else class="text-sm text-(color:--ui-muted)">Position unavailable</p>
+        <div class="flex flex-wrap justify-between gap-1">
+          <span class="text-(color:--ui-muted)">Last state received</span>
+          <time v-if="selected.lastStateAt" :datetime="selected.lastStateAt" class="font-mono text-xs">{{ formatEventTime(selected.lastStateAt) }}</time>
+          <span v-else>—</span>
+        </div>
         <div class="flex justify-between"><span class="text-(color:--ui-muted)">Map</span><span class="font-mono text-xs">{{ selected.mapId || '-' }}</span></div>
         <div class="flex justify-between"><span class="text-(color:--ui-muted)">Last node</span><span class="font-mono text-xs">{{ selected.lastNodeId || '-' }}</span></div>
-        <div class="flex justify-between"><span class="text-(color:--ui-muted)">Mission</span><span class="font-mono text-xs">{{ selected.mission || '-' }}</span></div>
-        <template v-if="selected.route">
+        <div class="flex flex-wrap justify-between gap-2">
+          <span class="text-(color:--ui-muted)">{{ lastReported ? 'Last reported mission' : 'Current mission' }}</span>
+          <span class="font-mono text-xs">{{ selected.mission || '—' }}</span>
+          <RouterLink v-if="selected.mission" :to="{ name: 'missions', query: { missionId: selected.mission } }"
+                      class="text-xs text-(color:--ui-link) hover:underline">Open mission</RouterLink>
+        </div>
+        <template v-if="selectedRoute">
           <div v-if="routesStale" class="text-xs font-medium text-amber-700 dark:text-amber-300">Last known route</div>
           <div class="flex justify-between">
             <span class="text-(color:--ui-muted)">Step</span>
-            <span class="font-mono text-xs">{{ selected.route.stepIndex + 1 }} → {{ selected.route.goals[0] }}</span>
+            <span class="font-mono text-xs">{{ selectedRoute.stepIndex + 1 }} → {{ selectedRoute.goals[0] }}</span>
           </div>
           <div class="flex justify-between">
             <span class="text-(color:--ui-muted)">Nodes ahead</span>
-            <span class="font-mono text-xs">{{ Math.max(0, selected.route.released.nodes.length - 1) }}</span>
+            <span class="font-mono text-xs">{{ Math.max(0, selectedRoute.released.nodes.length - 1) }}</span>
           </div>
-          <div v-if="selected.route.nextMissionId" class="flex justify-between">
+          <div v-if="selectedRoute.nextMissionId" class="flex justify-between">
             <span class="text-(color:--ui-muted)">Next mission</span>
-            <span class="font-mono text-xs">{{ selected.route.nextMissionId }}</span>
+            <span class="font-mono text-xs">{{ selectedRoute.nextMissionId }}</span>
           </div>
         </template>
         <NButton
@@ -705,5 +807,9 @@ const tooltipX = computed(() => Math.min(hovered.value ? hovered.value.px + 24 :
 .robot-marker {
   cursor: pointer;
   transition: transform 200ms linear;
+}
+.robot-marker.is-followed { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .robot-marker { transition: none; }
 }
 </style>

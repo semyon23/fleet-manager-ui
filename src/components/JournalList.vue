@@ -7,6 +7,7 @@ import { NButton, NSelect, NDatePicker, NEmpty } from 'naive-ui'
 import * as api from '../api'
 import { formatJournalEvent, SOURCES } from '../lib/journal'
 import { useRobotsStore } from '../stores/robots'
+import EventRow from './EventRow.vue'
 
 const props = defineProps({
   robotId: { type: String, default: null },
@@ -68,12 +69,6 @@ const sourceOptions = SOURCES.map((s) => ({ label: s.charAt(0) + s.slice(1).toLo
 const robotOptions = computed(() => robots.robots.map((r) => ({ label: r.id, value: r.id })))
 
 const lines = computed(() => items.value.map((e) => ({ ...e, ...formatJournalEvent(e) })))
-
-// Сегодня — только время, иначе дата и время
-function when(iso) {
-  const d = new Date(iso)
-  return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString() : d.toLocaleString()
-}
 </script>
 
 <template>
@@ -90,19 +85,22 @@ function when(iso) {
 
     <NEmpty v-if="!lines.length && !loading" size="small" description="Nothing in the journal yet" class="py-4" />
     <ol v-else class="flex flex-col">
-      <li v-for="line in lines" :key="line.id"
-          class="flex items-start gap-3 border-b border-slate-100 py-1.5 text-sm last:border-0 dark:border-slate-800">
-        <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" :style="{ background: line.color }" />
-        <div class="min-w-0 flex-1">
+      <li v-for="line in lines" :key="line.id" class="border-b border-(--ui-border) py-2 last:border-0">
+        <EventRow :at="line.at">
           <div class="flex flex-wrap items-baseline gap-x-2">
-            <span class="font-medium">{{ line.title }}</span>
-            <span v-if="line.robotId && !robotId" class="font-mono text-xs text-brand-800 dark:text-brand-300">{{ line.robotId }}</span>
+            <span class="inline-flex min-w-0 items-baseline gap-2 font-medium">
+              <span aria-hidden="true" class="h-2 w-2 shrink-0 rounded-full" :style="{ background: line.color }" />
+              <span>{{ line.title }}</span>
+            </span>
+            <RouterLink v-if="line.robotId && !robotId" :to="{ name: 'live', query: { robotId: line.robotId } }"
+                        :title="`Show ${line.robotId} on map`" class="font-mono text-xs text-(color:--ui-link) hover:underline">
+              {{ line.robotId }}
+            </RouterLink>
             <button v-if="line.missionId && !missionId" class="font-mono text-xs text-(color:--ui-link) hover:underline"
                     @click="emit('open-mission', line.missionId)">{{ line.missionId }}</button>
           </div>
-          <div v-if="line.detail" class="truncate text-xs text-(color:--ui-muted)" :title="line.detail">{{ line.detail }}</div>
-        </div>
-        <span class="shrink-0 font-mono text-[11px] text-(color:--ui-muted)">{{ when(line.at) }}</span>
+          <div v-if="line.detail" class="mt-0.5 text-xs text-(color:--ui-muted)">{{ line.detail }}</div>
+        </EventRow>
       </li>
     </ol>
 

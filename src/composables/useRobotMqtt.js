@@ -73,12 +73,14 @@ function handleMessage(topic, payload) {
 
   if (parts[4] === 'visualization') {
     const p = msg?.mobileRobotPosition
-    if (!p) return
+    if (!p || ![p.x, p.y, p.theta].every(Number.isFinite)) return
+    if (typeof p.mapId !== 'string' || !p.mapId) return
     schedulePose(robotId, {
-      x: Number(p.x) || 0,
-      y: Number(p.y) || 0,
-      theta: Number(p.theta) || 0,
+      x: p.x,
+      y: p.y,
+      theta: p.theta,
       mapId: p.mapId,
+      positionInitialized: typeof p.localized === 'boolean' ? p.localized : undefined,
       path: robotPathOf(msg),   // путь, который робот рассчитал сам (VDA 6.7: plannedPath, intermediatePath)
     })
   } else if (parts[4] === 'connection') {

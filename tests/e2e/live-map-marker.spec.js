@@ -22,7 +22,7 @@ function robot(id, state, x, theta) {
   }
 }
 
-test('Live Map selects an oriented chassis independently of hover and robot names', async ({ page }) => {
+async function openLiveMap(page) {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.route('**/config.js', route => route.fulfill({
     contentType: 'application/javascript',
@@ -31,7 +31,7 @@ test('Live Map selects an oriented chassis independently of hover and robot name
   const responses = {
     '/api/health': { status: 'OK' },
     '/api/fms/maps': [map],
-    '/api/fms/maps/workshop': map,
+    '/api/fms/maps/workshop': { ...map, pgmDataUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="160"%3E%3Crect width="200" height="160" fill="gray"/%3E%3C/svg%3E' },
     '/api/fms/robots': [robot('AMR-07', 'IDLE', 4, Math.PI / 2), robot('AMR-12', 'CHARGING', 16, 0)],
     '/api/fms/routes': { items: [] },
     '/api/fms/alarms': { items: [], nextCursor: null },
@@ -44,7 +44,11 @@ test('Live Map selects an oriented chassis independently of hover and robot name
   })
   await page.goto('live')
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  return responses['/api/fms/robots']
+}
 
+test('Live Map selects an oriented chassis independently of hover and robot names', async ({ page }) => {
+  await openLiveMap(page)
   const idle = page.getByRole('button', { name: 'AMR-07 · Idle', exact: true })
   const charging = page.getByRole('button', { name: 'AMR-12 · Charging', exact: true })
   const details = page.getByRole('button', { name: 'Robot details', exact: true })
@@ -93,4 +97,71 @@ test('Live Map selects an oriented chassis independently of hover and robot name
   await expect(charging).toBeVisible()
   await names.click()
   await expect(name).toBeVisible()
+})
+
+test('Live Map covers the viewport with its grid and follows a moving robot', async ({ page }) => {
+  const fleet = await openLiveMap(page)
+  const first = page.getByRole('button', { name: 'AMR-07 · Idle', exact: true })
+  const second = page.getByRole('button', { name: 'AMR-12 · Charging', exact: true })
+  const grid = page.locator('rect[fill="url(#live-map-grid)"]')
+  const image = page.locator('svg image').first()
+
+  const centerOffset = marker => marker.evaluate(node => {
+    const box = node.ownerSVGElement.getBoundingClientRect()
+    const { e: x, f: y } = node.getScreenCTM()
+    return Math.hypot(x - box.left - box.width / 2, y - box.top - box.height / 2)
+  })
+  const expectGridCoverage = () => expect.poll(() => grid.evaluate(node => {
+    const viewport = node.ownerSVGElement.getBoundingClientRect()
+    const bounds = node.getBoundingClientRect()
+    return Math.max(bounds.left - viewport.left, viewport.right - bounds.right,
+      bounds.top - viewport.top, viewport.bottom - bounds.bottom)
+  })).toBeLessThan(1)
+  const imageLeft = () => image.evaluate(node => node.getBoundingClientRect().left)
+
+  await expect(first).toBeVisible()
+  await expectGridCoverage()
+  expect(await grid.evaluate(node => Boolean(
+    node.ownerSVGElement.querySelector('image').compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ))).toBe(true)
+
+  await first.click()
+  await expect.poll(() => centerOffset(first)).toBeLessThan(2)
+  await page.getByTitle('Zoom in', { exact: true }).click()
+  await expect.poll(() => centerOffset(first)).toBeLessThan(2)
+  await expectGridCoverage()
+  const details = page.getByRole('button', { name: 'Robot details', exact: true })
+  await details.click()
+  await expect(details).toHaveAttribute('aria-expanded', 'false')
+  await expect.poll(() => centerOffset(first)).toBeLessThan(2)
+  await details.click()
+  await expect(details).toHaveAttribute('aria-expanded', 'true')
+
+  const beforeMove = await imageLeft()
+  Object.assign(fleet[0].status.pose, { x: 7, y: 11 })
+  await expect(page.getByText('7.00, 11.00 m', { exact: true })).toBeVisible()
+  await expect.poll(() => centerOffset(first)).toBeLessThan(2)
+  await expect.poll(imageLeft).toBeLessThan(beforeMove - 10)
+  await expectGridCoverage()
+
+  const start = await first.evaluate(node => {
+    const { left, top } = node.ownerSVGElement.getBoundingClientRect()
+    return { x: left + 16, y: top + 50 }
+  })
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.down()
+  await page.mouse.move(start.x + 64, start.y + 36, { steps: 6 })
+  await page.mouse.up()
+  await expect.poll(() => centerOffset(first)).toBeGreaterThan(40)
+  const afterPan = await imageLeft()
+  fleet[0].status.pose.x = 9
+  await expect(page.getByText('9.00, 11.00 m', { exact: true })).toBeVisible()
+  expect(await imageLeft()).toBeCloseTo(afterPan, 0)
+  await expectGridCoverage()
+
+  await second.press('Enter')
+  await expect.poll(() => centerOffset(second)).toBeLessThan(2)
+  await page.getByTitle('Fit to map', { exact: true }).click()
+  await expect.poll(() => centerOffset(second)).toBeGreaterThan(20)
+  await expectGridCoverage()
 })

@@ -55,9 +55,18 @@ describe('useRobotMqtt — VDA 5050 v3 topics by serialNumber', () => {
 
   it('applies mobileRobotPosition to the robot with that id', () => {
     mqttModule.subscribeRobot(robot)
-    publish('amr/v3/ktc/amr1/visualization', { mobileRobotPosition: { x: 1.5, y: -2, theta: 0.3, mapId: 'map_1' } })
+    publish('amr/v3/ktc/amr1/visualization', { mobileRobotPosition: { x: 1.5, y: -2, theta: 0.3, mapId: 'map_1', localized: true } })
     const stored = useRobotsStore().robots[0]
     expect([stored.x, stored.y, stored.theta, stored.mapId]).toEqual([1.5, -2, 0.3, 'map_1'])
+    expect(stored.positionInitialized).toBe(true)
+  })
+
+  it('keeps the previous pose when a visualization is missing a coordinate', () => {
+    const stored = useRobotsStore()
+    stored.robots[0].x = 4
+    mqttModule.subscribeRobot(robot)
+    publish('amr/v3/ktc/amr1/visualization', { mobileRobotPosition: { y: 6, theta: 0, mapId: 'map_1', localized: true } })
+    expect(stored.robots[0]).toMatchObject({ x: 4, mapId: null })
   })
 
   it('connection not ONLINE makes the robot offline at once', () => {

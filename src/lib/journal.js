@@ -8,6 +8,15 @@ import { SEVERITY } from './alarms'
 
 export const SOURCES = ['MISSION', 'ROBOT', 'ALARM', 'SYSTEM']
 
+const dateTime = new Intl.DateTimeFormat('en-GB', {
+  dateStyle: 'short', timeStyle: 'medium', hourCycle: 'h23',
+})
+
+export function formatEventTime(iso) {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime()) ? '—' : dateTime.format(date)
+}
+
 const GRAY = '#94a3b8'
 const CONNECTION = { ONLINE: '#22c55e', HIBERNATING: '#94a3b8' }   // остальное — потеря связи
 

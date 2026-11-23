@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, h, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   NCard, NDataTable, NButton, NModal, NInput, NSelect, NEmpty, NPopconfirm, NTabs, NTabPane, useMessage,
 } from 'naive-ui'
@@ -57,11 +58,14 @@ async function cancel(mission) {
 }
 
 // === Карточка миссии ===
-const openedId = ref(null)
-const showDrawer = ref(false)
-function openMission(id) {
-  openedId.value = id
-  showDrawer.value = true
+const route = useRoute()
+const router = useRouter()
+const openedId = computed(() => typeof route.query.missionId === 'string' ? route.query.missionId : null)
+function setMissionId(missionId) {
+  router.replace({ query: { ...route.query, missionId }, hash: route.hash })
+}
+function closeMission(show) {
+  if (!show) setMissionId(undefined)
 }
 
 // === Таблицы ===
@@ -71,7 +75,7 @@ const tag = (meta) => h(FleetStatusTag, { size: 'small', color: meta.color }, { 
 const commonColumns = [
   {
     title: 'Mission', key: 'id',
-    render: (m) => h('button', { class: 'flex flex-col text-left', onClick: () => openMission(m.id) }, [
+    render: (m) => h('button', { class: 'flex flex-col text-left', onClick: () => setMissionId(m.id) }, [
       h('span', { class: 'font-mono text-xs text-(color:--ui-link) hover:underline' }, m.id),
       h('span', { class: 'text-xs text-(color:--ui-muted)' }, m.name),
     ]),
@@ -224,12 +228,12 @@ async function submit() {
         </NTabPane>
 
         <NTabPane name="history" tab="History" display-directive="show:lazy">
-          <MissionHistory @open="openMission" />
+          <MissionHistory @open="setMissionId" />
         </NTabPane>
       </NTabs>
     </NCard>
 
-    <MissionDrawer v-model:show="showDrawer" :mission-id="openedId" @changed="refresh" />
+    <MissionDrawer :show="!!openedId" :mission-id="openedId" @update:show="closeMission" @changed="refresh" />
 
     <!-- ============================================================= -->
     <!-- Мастер создания                                                -->

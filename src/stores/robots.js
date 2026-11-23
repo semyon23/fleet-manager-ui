@@ -99,6 +99,7 @@ export const useRobotsStore = defineStore('robots', () => {
     const idx = robots.value.findIndex((r) => r.id === robotId)
     if (idx === -1) return
     const cur = robots.value[idx]
+    const sameMap = patch.mapId === undefined || patch.mapId === cur.mapId
     if (patch.x !== undefined) poseAt.set(robotId, Date.now())
     robots.value[idx] = {
       ...cur,
@@ -106,6 +107,7 @@ export const useRobotsStore = defineStore('robots', () => {
       y: patch.y ?? cur.y,
       theta: patch.theta ?? cur.theta,
       mapId: patch.mapId ?? cur.mapId,
+      positionInitialized: patch.positionInitialized ?? (sameMap && cur.positionInitialized),
       path: patch.path ?? cur.path,
       connection: patch.connection ?? cur.connection,
       availability: patch.availability ?? cur.availability,
@@ -119,7 +121,8 @@ export const useRobotsStore = defineStore('robots', () => {
     robots.value = freshList.map((r) => {
       const cur = previous.get(r.id)
       if (!cur || !(now - (poseAt.get(r.id) || 0) < POSE_FRESH_MS)) return { ...r }
-      return { ...r, x: cur.x, y: cur.y, theta: cur.theta, mapId: cur.mapId, path: cur.path }
+      return { ...r, x: cur.x, y: cur.y, theta: cur.theta, mapId: cur.mapId,
+        positionInitialized: cur.positionInitialized, path: cur.path }
     })
   }
 

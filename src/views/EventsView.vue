@@ -4,8 +4,10 @@ import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NCard, NTabs, NTabPane, NButton, NEmpty, NPopconfirm, useMessage } from 'naive-ui'
 import FleetStatusTag from '../components/FleetStatusTag.vue'
+import EventRow from '../components/EventRow.vue'
 import { useAlarmsStore } from '../stores/alarms'
 import { severityOf, statusOf } from '../lib/alarms'
+import { formatEventTime } from '../lib/journal'
 import JournalList from '../components/JournalList.vue'
 import MissionDrawer from '../components/MissionDrawer.vue'
 
@@ -48,8 +50,6 @@ async function ackAll() {
   alarms.refresh()
 }
 
-const when = (iso) => (iso ? new Date(iso).toLocaleString() : '')
-
 // === Карточка миссии из журнала ===
 const missionId = ref(null)
 const showMission = ref(false)
@@ -89,33 +89,43 @@ function openMission(id) {
         <NEmpty v-if="!visible.length" class="py-10"
                 :description="alarms.sorted.length ? 'Nothing matches this filter' : 'No alarms — everything is quiet'" />
 
-        <div v-else class="flex flex-col gap-2">
-          <div v-for="a in visible" :key="a.id" class="rounded border p-3"
-               :class="a.active ? 'border-slate-300 dark:border-slate-600' : 'border-slate-200 opacity-75 dark:border-slate-800'"
-               :style="{ borderLeft: `4px solid ${severityOf(a).color}`, borderRadius: 0 }">
-            <div class="flex items-start gap-3">
-              <FleetStatusTag size="small" :color="severityOf(a).color">{{ severityOf(a).label }}</FleetStatusTag>
-              <div class="min-w-0 flex-1">
-                <div class="font-medium">{{ a.title }}</div>
-                <div class="text-sm text-slate-600 dark:text-slate-300">{{ a.detail }}</div>
-                <div class="mt-1 flex flex-wrap gap-x-3 font-mono text-[11px] text-(color:--ui-muted)">
-                  <span>{{ statusOf(a) }}</span>
-                  <span v-if="a.robotId" class="text-brand-800 dark:text-brand-300">{{ a.robotId }}</span>
-                  <span>since {{ when(a.createdAt) }}</span>
-                  <span v-if="a.clearedAt">cleared {{ when(a.clearedAt) }}</span>
-                  <span>{{ a.code }}</span>
+        <ul v-else class="flex flex-col gap-2">
+          <li v-for="a in visible" :key="a.id" class="border border-(--ui-border) border-l-4 p-3" :class="{ 'opacity-75': !a.active }"
+              :style="{ borderLeftColor: severityOf(a).color }">
+            <EventRow :at="a.createdAt">
+              <div class="flex flex-wrap items-start gap-x-4 gap-y-2">
+                <div class="min-w-0 flex-[1_1_14rem]">
+                  <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span class="font-semibold">{{ a.title }}</span>
+                    <FleetStatusTag size="tiny" :color="severityOf(a).color">{{ severityOf(a).label }}</FleetStatusTag>
+                  </div>
+                  <div v-if="a.detail" class="mt-0.5 text-sm text-(color:--ui-muted)">{{ a.detail }}</div>
+                  <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-(color:--ui-muted)">
+                    <span>{{ statusOf(a) }}</span>
+                    <span v-if="a.robotId" class="font-mono text-brand-800 dark:text-brand-300">{{ a.robotId }}</span>
+                    <span class="font-mono">{{ a.code }}</span>
+                    <span v-if="a.clearedAt">Cleared <time :datetime="a.clearedAt">{{ formatEventTime(a.clearedAt) }}</time></span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-1">
+                  <RouterLink v-if="a.robotId" :to="{ name: 'live', query: { robotId: a.robotId } }"
+                              class="self-center px-2 text-xs font-medium text-(color:--ui-link) hover:underline">
+                    Show on map
+                  </RouterLink>
+                  <RouterLink v-if="a.missionId" :to="{ name: 'missions', query: { missionId: a.missionId } }"
+                              class="self-center px-2 text-xs font-medium text-(color:--ui-link) hover:underline">
+                    Mission at alarm · {{ a.missionId }}
+                  </RouterLink>
+                  <NButton size="tiny" tertiary :aria-expanded="historyOf === a.id" @click="historyOf = historyOf === a.id ? null : a.id">History</NButton>
+                  <NButton v-if="!a.acknowledgedAt" size="tiny" type="primary" @click="ack(a)">Acknowledge</NButton>
                 </div>
               </div>
-              <div class="flex shrink-0 gap-1">
-                <NButton size="tiny" tertiary @click="historyOf = historyOf === a.id ? null : a.id">History</NButton>
-                <NButton v-if="!a.acknowledgedAt" size="tiny" type="primary" @click="ack(a)">Acknowledge</NButton>
-              </div>
-            </div>
+            </EventRow>
             <div v-if="historyOf === a.id" class="mt-2 border-t border-slate-100 pt-2 dark:border-slate-800">
-              <JournalList :alarm-id="a.id" :limit="20" :more="false" />
+              <JournalList :alarm-id="a.id" :limit="20" :more="false" @open-mission="openMission" />
             </div>
-          </div>
-        </div>
+          </li>
+        </ul>
       </NTabPane>
 
       <NTabPane name="journal" tab="Journal" display-directive="show:lazy">

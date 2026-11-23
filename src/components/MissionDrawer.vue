@@ -20,21 +20,28 @@ const mission = ref(null)
 const events = ref([])
 const error = ref(null)
 const now = ref(Date.now())
+let pending = null
 
 async function load() {
-  if (!props.missionId || (typeof document !== 'undefined' && document.visibilityState === 'hidden')) return
+  const id = props.missionId
+  if (!props.show || !id || pending || (typeof document !== 'undefined' && document.visibilityState === 'hidden')) return
+  const request = Symbol()
+  pending = request
   try {
     const [m, e] = await Promise.all([
-      api.missions.getMission(props.missionId),
-      api.missions.listMissionEvents(props.missionId),
+      api.missions.getMission(id),
+      api.missions.listMissionEvents(id),
     ])
+    if (pending !== request) return
     mission.value = m
     events.value = e
     now.value = Date.now()
     error.value = null
     if (isFinished(m)) stop()
   } catch (e) {
-    error.value = e?.status === 404 ? `Mission ${props.missionId} not found` : (e?.message || 'Failed to load the mission')
+    if (pending === request) error.value = e?.status === 404 ? `Mission ${id} not found` : (e?.message || 'Failed to load the mission')
+  } finally {
+    if (pending === request) pending = null
   }
 }
 
@@ -42,13 +49,15 @@ let timer = null
 function stop() { if (timer) { clearInterval(timer); timer = null } }
 watch(() => [props.show, props.missionId], ([show]) => {
   stop()
+  pending = null
+  error.value = null
   mission.value = null
   events.value = []
   if (!show) return
   load()
   timer = setInterval(load, 3000)
 }, { immediate: true })
-onBeforeUnmount(stop)
+onBeforeUnmount(() => { stop(); pending = null })
 
 const timing = computed(() => (mission.value ? timingOf(mission.value, now.value) : {}))
 const time = (iso) => (iso ? new Date(iso).toLocaleString() : '—')
