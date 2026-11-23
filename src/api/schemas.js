@@ -237,11 +237,13 @@ export function toViewRobot(r) {
     y: s?.pose?.y ?? 0,
     theta: s?.pose?.theta ?? 0,
     mapId: s?.pose?.mapId ?? null,
+    localized: s?.localized ?? null,  // Последний state от FMS. positionInitialized также обновляется из MQTT visualization.
     positionInitialized: s?.localized ?? false,
     driving: s?.driving ?? false,
     lastNodeId: s?.lastNodeId || '',
     paused: s?.paused ?? false,
     operatingMode: s?.operatingMode ?? null,
+    safety: s?.safety ?? null,
     lastStateAt: s?.lastStateAt ?? null,
     errors: s?.errors ?? [],
     loads: s?.loads ?? [],

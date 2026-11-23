@@ -94,6 +94,8 @@ describe('Robot v2 (контракт, раздел 5.1) → внутренний
     expect(r.mission).toBe('m-102')
     expect(r.loads).toEqual([])
     expect(r.connection).toBe('ONLINE')
+    expect(r.localized).toBe(true)
+    expect(r.safety).toEqual(robot.status.safety)
     expect(r.positionInitialized).toBe(true)
   })
 
@@ -105,6 +107,8 @@ describe('Robot v2 (контракт, раздел 5.1) → внутренний
     expect(r.mission).toBe(null)
     expect(r.loads).toEqual([])
     expect(r.connection).toBe('UNKNOWN')
+    expect(r.localized).toBeNull()
+    expect(r.safety).toBeNull()
   })
 
   it('preserves every reported load even when the robot supplies no identifiers', () => {

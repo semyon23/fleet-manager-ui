@@ -505,7 +505,7 @@ POST /fms/robots/amr-01/position
 {
   "state": "RUNNING",                 // PENDING | RUNNING | COMPLETED | FAILED | SKIPPED | CANCELED
   "startedAt": "..." | null, "finishedAt": "..." | null,
-  "waitingForTraffic": false,         // стоит и ждёт, когда освободится проезд; пока всегда false (трафика нет)
+  "waitingForTraffic": false,         // true — робот стоит и ждёт разрешения на продолжение проезда
   "actions": [ { "actionId": "a-1", "actionType": "pick", "status": "RUNNING" } ]
   // status: WAITING | INITIALIZING | RUNNING | PAUSED | RETRIABLE | FINISHED | FAILED
 }

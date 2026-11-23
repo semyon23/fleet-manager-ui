@@ -23,7 +23,7 @@ function robot(id, state, x, theta) {
 }
 
 async function openLiveMap(page, fleet = [robot('AMR-07', 'IDLE', 4, Math.PI / 2), robot('AMR-12', 'CHARGING', 16, 0)],
-                           { waypoints = [], edges = [], routes = [] } = {}) {
+                           { waypoints = [], edges = [], routes = [], missions = [] } = {}) {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.route('**/config.js', route => route.fulfill({
     contentType: 'application/javascript',
@@ -37,6 +37,7 @@ async function openLiveMap(page, fleet = [robot('AMR-07', 'IDLE', 4, Math.PI / 2
     '/api/fms/routes': { items: routes },
     '/api/fms/alarms': { items: [], nextCursor: null },
   }
+  for (const mission of missions) responses[`/api/fms/missions/${mission.id}`] = mission
   await page.route('**/api/**', route => {
     const path = new URL(route.request().url()).pathname
     return Object.hasOwn(responses, path)
@@ -157,6 +158,50 @@ test('Live Map shows reported loads independently of missions and updates the se
   await expect(onMission.locator('.robot-load')).toHaveCount(0)
   await expect(details.locator('.robot-load')).toHaveCount(0)
   await expect(onMission.locator('.robot-hub')).toBeVisible()
+})
+
+test('Live Map diagnoses the selected robot from its current mission and hides stale error hints', async ({ page }) => {
+  const waiting = robot('AMR-07', 'BUSY', 4, 0)
+  waiting.status.missionId = 'M-184'
+  const stateAt = waiting.status.lastStateAt
+  const missionAt = '2026-01-01T12:00:03Z'
+  const mission = {
+    id: 'M-184', name: 'Deliver to dock', mapId: map.id, priority: 'NORMAL', state: 'RUNNING',
+    requestedRobotId: null, robotId: waiting.id, currentStep: 1, steps: [{ nodeId: 'N-11' }, { nodeId: 'N-23' }],
+    stepStates: [
+      { state: 'COMPLETED', startedAt: stateAt, finishedAt: stateAt, waitingForTraffic: false },
+      { state: 'RUNNING', startedAt: stateAt, finishedAt: null, waitingForTraffic: true },
+    ],
+    error: null, createdBy: null, createdAt: stateAt, assignedAt: stateAt, startedAt: stateAt,
+    updatedAt: missionAt, finishedAt: null,
+  }
+  const faulted = robot('AMR-12', 'ERROR', 16, 0)
+  const error = { errorType: 'LIFT_ENCODER', level: 'CRITICAL', description: 'Lift encoder signal lost',
+    hint: 'Inspect the encoder connector.' }
+  faulted.status.errors = [error]
+  await openLiveMap(page, [waiting, faulted], { missions: [mission] })
+
+  const diagnostics = page.getByRole('region', { name: 'Robot diagnostics' })
+  const traffic = diagnostics.getByText('Waiting for traffic clearance', { exact: true })
+  await page.getByRole('button', { name: 'AMR-07 · Busy', exact: true }).press('Enter')
+  await expect(traffic).toBeVisible()
+  await expect(diagnostics).toContainText('M-184')
+  await expect(diagnostics).toContainText('N-23')
+  await expect(diagnostics.locator(`time[datetime="${stateAt}"]`)).toBeVisible()
+  await expect(diagnostics.locator(`time[datetime="${missionAt}"]`)).toBeVisible()
+
+  await page.getByRole('button', { name: 'AMR-12 · Error', exact: true }).press('Enter')
+  await expect(diagnostics).toContainText(error.errorType)
+  await expect(diagnostics).toContainText(error.description)
+  await expect(diagnostics).toContainText(error.hint)
+  await expect(traffic).toHaveCount(0)
+  await expect(diagnostics).not.toContainText('M-184')
+
+  faulted.availability.state = 'OFFLINE'
+  faulted.status.connection = 'OFFLINE'
+  await expect(diagnostics.getByText('Robot connection lost', { exact: true })).toBeVisible()
+  await expect(diagnostics).not.toContainText(error.hint)
+  await expect(diagnostics.locator(`time[datetime="${stateAt}"]`)).toBeVisible()
 })
 
 test('Live Map distinguishes road directions and released and planned routes for each robot', async ({ page }) => {

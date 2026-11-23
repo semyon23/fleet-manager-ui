@@ -12,10 +12,11 @@ import { stationKindMeta } from '../lib/theme'
 import { zoneTypeMeta } from '../lib/vda5050'
 import { worldToPixel } from '../lib/nav2meta'
 import { worldAngleToSvgDeg } from '../lib/geometry'
-import { formatEventTime } from '../lib/journal'
+import { useSelectedRobotMission } from '../composables/useSelectedRobotMission'
 import PlaceRobotDialog from '../components/PlaceRobotDialog.vue'
 import MapRobotShape from '../components/MapRobotShape.vue'
 import LiveRobotList from '../components/LiveRobotList.vue'
+import RobotDiagnostics from '../components/RobotDiagnostics.vue'
 import FleetStatusTag from '../components/FleetStatusTag.vue'
 
 const robots = useRobotsStore()
@@ -38,6 +39,10 @@ function isLastReported(robot) {
   return robot.connection !== 'ONLINE' || robot.availability?.state === 'OFFLINE' || !!robots.lastPollError
 }
 const lastReported = computed(() => selected.value && isLastReported(selected.value))
+const diagnosticMission = useSelectedRobotMission(() => {
+  const robot = selected.value
+  return detailsOpen.value && robot?.lastStateAt && !lastReported.value && !robot.driving ? robot : null
+})
 
 function focusRobot(id) {
   selectedId.value = id
@@ -752,25 +757,25 @@ const tooltipTransform = computed(() => {
                            :loaded="selected.loads.length > 0" :driving="selected.driving && !lastReported" detailed />
           </svg>
         </div>
+        <RobotDiagnostics v-if="detailsOpen" :robot="selected" :mission-snapshot="diagnosticMission"
+                          :poll-error="!!robots.lastPollError" />
         <div class="flex justify-between"><span class="text-(color:--ui-muted)">Model</span><span class="font-mono">{{ selected.model }}</span></div>
         <div class="flex justify-between">
           <span class="text-(color:--ui-muted)">State</span>
           <FleetStatusTag :color="selectedLook.color" size="small">{{ selectedLook.label }}</FleetStatusTag>
         </div>
-        <ul v-if="selected.availability?.reasons?.length" class="list-disc pl-5 text-xs text-slate-500 dark:text-slate-400">
-          <li v-for="reason in selected.availability.reasons" :key="reason.code">{{ reason.message }}</li>
-        </ul>
+        <details v-if="selected.availability?.reasons?.length" class="text-xs text-(color:--ui-muted)">
+          <summary class="cursor-pointer">{{ lastReported ? 'Last reported availability details' : 'Availability details' }}</summary>
+          <ul class="mt-1 list-disc pl-5">
+            <li v-for="(reason, index) in selected.availability.reasons" :key="index">{{ reason.message || reason.code }}</li>
+          </ul>
+        </details>
         <div v-if="selected.lastStateAt" class="flex justify-between"><span class="text-(color:--ui-muted)">Battery</span><span class="font-mono">{{ selected.battery }}%{{ selected.charging ? ' ⚡' : '' }}</span></div>
         <template v-if="hasPosition(selected)">
           <div class="flex justify-between gap-2"><span class="text-(color:--ui-muted)">{{ lastReported ? 'Last known position' : 'Position' }}</span><span class="font-mono text-xs">{{ selected.x.toFixed(2) }}, {{ selected.y.toFixed(2) }} m</span></div>
           <div class="flex justify-between"><span class="text-(color:--ui-muted)">Heading</span><span class="font-mono text-xs">{{ ((selected.theta * 180) / Math.PI).toFixed(1) }}°</span></div>
         </template>
         <p v-else class="text-sm text-(color:--ui-muted)">Position unavailable</p>
-        <div class="flex flex-wrap justify-between gap-1">
-          <span class="text-(color:--ui-muted)">Last state received</span>
-          <time v-if="selected.lastStateAt" :datetime="selected.lastStateAt" class="font-mono text-xs">{{ formatEventTime(selected.lastStateAt) }}</time>
-          <span v-else>—</span>
-        </div>
         <div class="flex justify-between"><span class="text-(color:--ui-muted)">Map</span><span class="font-mono text-xs">{{ selected.mapId || '-' }}</span></div>
         <div class="flex justify-between"><span class="text-(color:--ui-muted)">Last node</span><span class="font-mono text-xs">{{ selected.lastNodeId || '-' }}</span></div>
         <div class="flex flex-wrap justify-between gap-2">
