@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { releasedPoints, plannedPoints, goalPoints, toPolyline } from '../../src/lib/robotRoutes'
+import { releasedPoints, plannedPoints, goalPoints, toPolyline, routePolylines } from '../../src/lib/robotRoutes'
 
 // a ─ b ─ c ─ d по оси x, шаг 10
 const nodes = { a: { x: 0, y: 0 }, b: { x: 10, y: 0 }, c: { x: 20, y: 0 }, d: { x: 30, y: 0 } }
@@ -32,6 +32,25 @@ describe('robotRoutes — route nodes to points on the map', () => {
     const r = route(['a', 'b'], { planned: { nodes: ['c', 'd'], edges: [] } })
     expect(plannedPoints(r, position)).toEqual([nodes.b, nodes.c, nodes.d])
     expect(plannedPoints(route(['a', 'b']), position)).toEqual([])
+  })
+
+  it('draws the boundary node returned by FMS only once when a plan starts at the last released node', () => {
+    const r = route(['a', 'b'], { planned: { nodes: ['b', 'c', 'd'], edges: ['bc', 'cd'] } })
+    expect(plannedPoints(r, position)).toEqual([nodes.b, nodes.c, nodes.d])
+    const boundaryOnly = route(['a', 'b'], { planned: { nodes: ['b'], edges: [] } })
+    expect(routePolylines(plannedPoints(boundaryOnly, position))).toEqual([])
+  })
+
+  it('draws only contiguous route segments with coordinates on the open map', () => {
+    const r = route(['a', 'b', 'missing', 'c', 'd'], {
+      planned: { nodes: ['missing', 'a', 'b'], edges: [] },
+    })
+    const robotAt = { x: 4, y: 2 }
+    expect(routePolylines(releasedPoints(r, position, robotAt, { keepGaps: true })))
+      .toEqual(['4,2 10,0', '20,0 30,0'])
+    expect(routePolylines(plannedPoints(r, position, { keepGaps: true }))).toEqual(['0,0 10,0'])
+    expect(routePolylines(releasedPoints(route(['a', 'missing']), position, robotAt, { keepGaps: true })))
+      .toEqual([])
   })
 
   it('goals with positions, unknown goals skipped', () => {

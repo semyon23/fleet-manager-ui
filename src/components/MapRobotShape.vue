@@ -6,30 +6,37 @@ defineProps({
   selected: Boolean,
   detailed: Boolean,
   loaded: Boolean,
+  driving: Boolean,
 })
 
-// Нос смотрит по +X. Длина корпуса в координатах рисунка — от −31 до +31.
-const BODY_LENGTH = 62
+// Нос смотрит по +X; рамка выбора не входит в габарит корпуса.
+const BODY_LENGTH = 76
 </script>
 
 <template>
   <g :transform="`rotate(${rotate}) scale(${length / BODY_LENGTH})`">
-    <path v-if="selected" d="M-37-17v-10h10M27-27h10v10M37 17v10H27M-27 27h-10V17"
-          fill="none" class="selection-corners stroke-[#173f52] dark:stroke-[#d5f2ff]" stroke-width="2.8" stroke-linecap="round" />
-    <g fill="#1c252d" stroke="#d3dade" stroke-width="1.4">
-      <rect x="-10" y="-23" width="20" height="7" rx="2" />
-      <rect x="-10" y="16" width="20" height="7" rx="2" />
+    <path v-if="selected" class="selection-corners stroke-[#247233] dark:stroke-[#96df85]"
+          d="M-41-19v-10h10M31-29h10v10M41 19v10H31M-31 29h-10V19"
+          fill="none" stroke-width="1.7" vector-effect="non-scaling-stroke" />
+    <g class="robot-chassis">
+      <path d="M-34-23Q-38-19-38 0T-34 23Q-31 26-25 26H25Q31 26 34 23Q38 19 38 0T34-23Q31-26 25-26H-25Q-31-26-34-23Z"
+            fill="#305df4" />
+      <path d="M-28-23Q-24-26-18-26H18Q26-26 29-22Q34-16 34 0T29 22Q26 26 18 26H-18Q-25 26-29 22Q-34 16-34 0T-28-23Z"
+            fill="#2c2d2f" />
+      <path d="M34-3h3v6h-3Z" fill="#163caf" />
+      <path class="robot-status-light" d="M-37-3h3v6h-3Z" :fill="color" />
     </g>
-    <path d="M-31-13L-25-19H23L31-12V12L23 19H-25L-31 13Z"
-          fill="#29353e" stroke="#f0f4f6" stroke-width="2.4" stroke-linejoin="round" />
-    <rect x="-19" y="-14" width="33" height="28" rx="3" fill="#44515b" />
-    <path d="M-28-11L-24-15H-22V15H-24L-28 11Z" :fill="color" />
     <g v-if="loaded" class="robot-load">
-      <rect x="-18" y="-14" width="31" height="28" rx="2" fill="#e9b469" stroke="#362d25" stroke-width="2" />
-      <path d="M-8-12V12M3-12V12" fill="none" stroke="#99632e" stroke-width="2.5" />
-      <path v-if="detailed" d="M-15-10V10M10-10V10" stroke="#f8d39b" stroke-width="1.5" />
+      <rect x="-19" y="-18" width="35" height="36" rx="2" fill="#a77930" />
+      <rect x="-18" y="-18" width="34" height="34" rx="2" fill="#efc36d" />
+      <path d="M-4-17H1V15H-4Z" fill="#dfad57" />
+      <path v-if="detailed" d="M-1-8V9M-9 0H7" fill="none" stroke="#a47b41" stroke-width="1" />
     </g>
-    <path d="M17-6L25 0L17 6" fill="none" stroke="#f5f8fa" stroke-width="3.3"
-          stroke-linecap="round" stroke-linejoin="round" />
+    <g v-else class="robot-hub">
+      <circle cx="-1" cy="0" r="7.5" fill="#656668" />
+      <circle v-if="detailed" cx="-1" cy="0" r="11.8" fill="none" stroke="#656668"
+              stroke-width="1.5" stroke-linecap="round" stroke-dasharray=".5 8.8" />
+    </g>
+    <path class="robot-heading" d="M17-8L28 0L17 8Z" :fill="driving ? '#94e87d' : '#f7f8f9'" />
   </g>
 </template>

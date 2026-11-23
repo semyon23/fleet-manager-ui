@@ -22,7 +22,8 @@ function robot(id, state, x, theta) {
   }
 }
 
-async function openLiveMap(page, fleet = [robot('AMR-07', 'IDLE', 4, Math.PI / 2), robot('AMR-12', 'CHARGING', 16, 0)]) {
+async function openLiveMap(page, fleet = [robot('AMR-07', 'IDLE', 4, Math.PI / 2), robot('AMR-12', 'CHARGING', 16, 0)],
+                           { waypoints = [], edges = [], routes = [] } = {}) {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.route('**/config.js', route => route.fulfill({
     contentType: 'application/javascript',
@@ -31,9 +32,9 @@ async function openLiveMap(page, fleet = [robot('AMR-07', 'IDLE', 4, Math.PI / 2
   const responses = {
     '/api/health': { status: 'OK' },
     '/api/fms/maps': [map],
-    '/api/fms/maps/workshop': { ...map, pgmDataUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="160"%3E%3Crect width="200" height="160" fill="gray"/%3E%3C/svg%3E' },
+    '/api/fms/maps/workshop': { ...map, waypoints, edges, pgmDataUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="160"%3E%3Crect width="200" height="160" fill="gray"/%3E%3C/svg%3E' },
     '/api/fms/robots': fleet,
-    '/api/fms/routes': { items: [] },
+    '/api/fms/routes': { items: routes },
     '/api/fms/alarms': { items: [], nextCursor: null },
   }
   await page.route('**/api/**', route => {
@@ -62,8 +63,12 @@ test('Live Map selects an oriented chassis independently of hover and robot name
   const chassis = 'g[transform^="rotate("]'
   await expect(idle.locator(chassis)).toHaveAttribute('transform', /^rotate\(-90\)/)
   await expect(portrait.locator(chassis)).toHaveAttribute('transform', /^rotate\(-90\)/)
-  await expect(idle.locator('path[fill="#22c55e"]')).toBeVisible()
-  await expect(charging.locator('path[fill="#eab308"]')).toBeVisible()
+  await expect(idle.locator('.robot-chassis path[fill="#305df4"]')).toBeVisible()
+  await expect(idle.locator('.robot-status-light')).toHaveAttribute('fill', '#22c55e')
+  await expect(charging.locator('.robot-status-light')).toHaveAttribute('fill', '#eab308')
+  await expect(idle.locator('.robot-hub')).toBeVisible()
+  await expect(idle.locator('.robot-heading')).toHaveAttribute('fill', '#f7f8f9')
+  await expect(idle.locator('.robot-mission text')).toHaveText('No mission')
 
   await charging.hover()
   await expect(idle).toHaveAttribute('aria-pressed', 'true')
@@ -101,7 +106,8 @@ test('Live Map selects an oriented chassis independently of hover and robot name
 
 test('Live Map shows reported loads independently of missions and updates the selected portrait', async ({ page }) => {
   const loaded = robot('AMR-07', 'OFFLINE', 4, 0)
-  Object.assign(loaded.status, { connection: 'OFFLINE', loads: [{ loadId: '', loadType: '' }] })
+  // Driving in the last offline snapshot must not show current movement.
+  Object.assign(loaded.status, { connection: 'OFFLINE', driving: true, loads: [{ loadId: '', loadType: '' }] })
   const busy = robot('AMR-12', 'BUSY', 16, 0)
   Object.assign(busy.status, { missionId: 'M-102', loads: [] })
   await openLiveMap(page, [loaded, busy])
@@ -110,7 +116,11 @@ test('Live Map shows reported loads independently of missions and updates the se
   const onMission = page.getByRole('button', { name: 'AMR-12 · Busy', exact: true })
   const details = page.locator('#live-map-robot-details')
   await expect(offline.locator('.robot-load')).toBeVisible()
+  await expect(offline.locator('.robot-hub')).toHaveCount(0)
+  await expect(offline.locator('.robot-heading')).toHaveAttribute('fill', '#f7f8f9')
   await expect(onMission.locator('.robot-load')).toHaveCount(0)
+  await expect(onMission.locator('.robot-heading')).toHaveAttribute('fill', '#f7f8f9')
+  await expect(onMission.locator('.robot-mission text')).toHaveText('M-102')
   const roster = page.getByRole('button', { name: 'Robots (2)', exact: true })
   await roster.click()
   const search = page.getByRole('searchbox', { name: 'Search robots by ID' })
@@ -133,8 +143,12 @@ test('Live Map shows reported loads independently of missions and updates the se
   await expect(page.locator('.robot-mission')).toHaveCount(0)
   await expect(offline.locator('.robot-load')).toBeVisible()
 
+  busy.status.driving = true
   busy.status.loads = [{ loadId: 'PAL-41', loadType: 'EUR' }, { loadId: 'BOX-12', loadType: '' }]
   await expect(onMission.locator('.robot-load')).toBeVisible()
+  await expect(onMission.locator('.robot-hub')).toHaveCount(0)
+  await expect(onMission.locator('.robot-heading')).toHaveAttribute('fill', '#94e87d')
+  await expect(details.locator('.robot-heading')).toHaveAttribute('fill', '#94e87d')
   await expect(details.locator('.robot-load')).toBeVisible()
   await expect(details.getByText('ID · PAL-41')).toBeVisible()
   await expect(details.getByText('Type · EUR')).toBeVisible()
@@ -142,6 +156,61 @@ test('Live Map shows reported loads independently of missions and updates the se
   busy.status.loads = []
   await expect(onMission.locator('.robot-load')).toHaveCount(0)
   await expect(details.locator('.robot-load')).toHaveCount(0)
+  await expect(onMission.locator('.robot-hub')).toBeVisible()
+})
+
+test('Live Map distinguishes road directions and released and planned routes for each robot', async ({ page }) => {
+  const fleet = [robot('AMR-07', 'BUSY', 4, 0), robot('AMR-12', 'BUSY', 5, 0)]
+  fleet[0].status.missionId = 'M-184'
+  fleet[1].status.missionId = 'M-191'
+  const waypoints = [
+    { id: 'A', u: 20, v: 80 }, { id: 'B', u: 95, v: 105 }, { id: 'C', u: 165, v: 70 },
+  ]
+  const edges = [
+    { id: 'ab', from: 'A', to: 'B' }, { id: 'ba', from: 'B', to: 'A' }, { id: 'bc', from: 'B', to: 'C' },
+  ]
+  const routes = fleet.map(r => ({
+    robotId: r.id, mapId: map.id, missionId: r.status.missionId, stepIndex: 0,
+    released: { nodes: ['A', 'B'], edges: ['ab'] }, planned: { nodes: ['B', 'C'], edges: ['bc'] },
+    goals: ['C'], nextMissionId: null,
+  }))
+  await openLiveMap(page, fleet, { waypoints, edges, routes })
+
+  await expect(page.locator('.map-road[data-two-way="true"]')).toHaveCount(1)
+  await expect(page.locator('.map-road[data-two-way="false"]')).toHaveCount(1)
+  await expect(page.locator('.road-direction').first()).toBeVisible()
+  const first = page.locator('.fleet-route[data-robot-id="AMR-07"]')
+  const second = page.locator('.fleet-route[data-robot-id="AMR-12"]')
+  const released = first.locator('.route-released')
+  const planned = first.locator('.route-planned')
+  await expect(released).toBeVisible()
+  await expect(planned).toBeVisible()
+  await expect(released).toHaveCSS('stroke-dasharray', 'none')
+  await expect(planned).not.toHaveCSS('stroke-dasharray', 'none')
+  const color = await released.evaluate(line => getComputedStyle(line).stroke)
+  await expect(planned).toHaveCSS('stroke', color)
+  await expect(second.locator('.route-released')).not.toHaveCSS('stroke', color)
+  const releasedEnd = (await released.getAttribute('points')).trim().split(/\s+/).at(-1)
+  expect((await planned.getAttribute('points')).trim().split(/\s+/)[0]).toBe(releasedEnd)
+
+  await page.getByRole('button', { name: 'AMR-07 · Busy', exact: true }).press('Enter')
+  await expect(page.locator('.fleet-route').last()).toHaveAttribute('data-robot-id', 'AMR-07')
+  const routeOpacity = element => element.evaluate(group => Number(getComputedStyle(group).opacity))
+  expect(await routeOpacity(first)).toBeGreaterThan(await routeOpacity(second))
+  // A new availability state changes the robot status indicator, independently of its route color.
+  fleet[0].availability.state = 'PAUSED'
+  await expect(page.getByRole('button', { name: 'AMR-07 · Paused', exact: true })).toBeVisible()
+  await expect(released).toHaveCSS('stroke', color)
+
+  await page.getByRole('button', { name: /^Layers/ }).click()
+  await page.getByRole('checkbox', { name: 'Planned by traffic (waiting for release)' }).click()
+  await expect(planned).toHaveCount(0)
+  await expect(released).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Roads', exact: true }).click()
+  await expect(page.locator('.map-road')).toHaveCount(0)
+  await expect(released).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Routes from fms (released)' }).click()
+  await expect(released).toHaveCount(0)
 })
 
 test('Live Map covers the viewport with its grid and follows a moving robot', async ({ page }) => {
